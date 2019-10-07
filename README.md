@@ -17,7 +17,7 @@ In the future, possibly:
 
 ### Datalog-to-datafrog prototyping generator
 
-For _prototyping_ purposes, this will help generate a skeleton of a datafrog computation, from a set of Soufflé-like declarations, and _valid_ datalog rules (there are basically no error in the parser checking yet).
+For _prototyping_ purposes, this will help generate a skeleton of a datafrog computation, from a set of Soufflé-like declarations, and _valid_ datalog rules (there is basically no error checking in the parser yet).
 
 The generated skeleton should (hopefully) build as-is, but won't know where to get the data required by the relations. So it can help bootstrap using datafrog, and maybe get 80-90% of the way there.
 
