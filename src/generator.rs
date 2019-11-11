@@ -1,33 +1,45 @@
-use crate::parser;
-use crate::Literal;
-use crate::PredicateKind;
+use crate::{ast, parser, typechecker};
+use quote::ToTokens;
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::collections::HashMap;
 use std::fmt::{self, Write};
 
 /// The representation of what a datalog rule does in datafrog terms
-enum Operation<'a> {
+enum Operation {
     StaticMap(),
     DynamicMap(MapStep),
-    Join(Vec<JoinStep<'a>>),
+    Join(Vec<JoinStep>),
+}
+
+impl ast::Arg {
+    fn ident(&self) -> &syn::Ident {
+        match self {
+            ast::Arg::Ident(ident) => ident,
+            _ => unimplemented!("Generator does not support wildcards yet"),
+        }
+    }
+    fn to_string(&self) -> String {
+        self.ident().to_string()
+    }
 }
 
 /// The representation of a join, with the data required to serialize it as Rust code
 #[derive(Debug)]
-struct JoinStep<'a> {
+struct JoinStep {
     src_a: String,
     src_b: String,
 
     is_antijoin: bool,
 
-    key: Vec<&'a str>,
-    args: Vec<&'a str>,
+    key: Vec<String>,
+    args: Vec<String>,
 
-    remaining_args_a: Vec<&'a str>,
-    remaining_args_b: Vec<&'a str>,
+    remaining_args_a: Vec<String>,
+    remaining_args_b: Vec<String>,
 
     dest_predicate: String,
-    dest_key: Vec<&'a str>,
-    dest_args: Vec<&'a str>,
+    dest_key: Vec<String>,
+    dest_args: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -36,34 +48,25 @@ struct MapStep {
     dest_args: String,
 }
 
-/// Records the argument information of relation declarations
-#[derive(Debug, Clone)]
-pub struct ArgDecl {
-    pub name: String,
-    pub rust_type: String,
-}
-
-pub fn generate_skeleton_datafrog(decls: &str, text: &str, output: &mut String) {
+pub fn generate_skeleton_datafrog(text: &str, output: &mut String) {
     // Step 0: parse everything.
-    let decls = parser::parse_declarations(decls);
-    let program = parser::clean_program(text.to_string());
-    let mut rules = parser::parse(&program);
+    let program = parser::parse(text);
+    let program = match typechecker::typecheck(program) {
+        Ok(program) => program,
+        Err(err) => panic!("Error: {:?} (at {:?})", err, err.span.start()),
+    };
+    let decls = program.decls;
+    let rules = program.rules;
 
     // Step 1: analyze rules to separate extensional and intensional predicates.
     // These will end up being emitted as datafrog `Relation`s and `Variable`s, respectively.
     let mut intensional = FxHashSet::default();
-    for rule in rules.iter() {
-        intensional.insert(rule.head.predicate.clone());
-    }
-
     let mut extensional = FxHashSet::default();
-    for rule in rules.iter_mut() {
-        for literal in rule.body.iter_mut() {
-            if intensional.contains(&literal.predicate) {
-                literal.kind = PredicateKind::Intensional;
-            } else {
-                extensional.insert(literal.predicate.clone());
-            }
+    for decl in decls.values() {
+        if decl.kind != ast::PredicateKind::Input {
+            intensional.insert(decl.name.to_string());
+        } else {
+            extensional.insert(decl.name.to_string());
         }
     }
 
@@ -104,14 +107,14 @@ pub fn generate_skeleton_datafrog(decls: &str, text: &str, output: &mut String) 
                 // This a `map` operation.
 
                 // Record used inputs to filter code generation later
-                if !intensional.contains(&body[0].predicate) {
-                    extensional_inputs.insert(body[0].predicate.clone());
+                if !intensional.contains(&body[0].predicate.to_string()) {
+                    extensional_inputs.insert(body[0].predicate.to_string());
                 }
 
                 let operation = {
                     // If this is mapping over an extensional predicate, we can emit
                     // this outside of the datalog computation loop, since the input is static.
-                    if extensional.contains(&body[0].predicate) {
+                    if extensional.contains(&body[0].predicate.to_string()) {
                         Operation::StaticMap()
                     } else {
                         // otherwise, it's a map during computation
@@ -119,17 +122,30 @@ pub fn generate_skeleton_datafrog(decls: &str, text: &str, output: &mut String) 
                         let args_a: Vec<_> = rule.head.args.clone();
                         let args_b: Vec<_> = body[0].args.clone();
 
-                        let name_arg = |arg| {
-                            if args_a.contains(arg) {
-                                arg.to_string().to_lowercase()
-                            } else {
-                                format!("_{}", arg.to_string().to_lowercase())
-                            }
-                        };
+                        let src_args = args_b
+                            .iter()
+                            .map(|arg: &ast::Arg| {
+                                let arg = arg.ident();
+                                if args_a.contains(arg) {
+                                    arg.to_string().to_lowercase()
+                                } else {
+                                    format!("_{}", arg.to_string().to_lowercase())
+                                }
+                            })
+                            .collect::<Vec<_>>()
+                            .join(", ");
 
-                        let src_args = args_b.iter().map(name_arg).collect::<Vec<_>>().join(", ");
-                        let mut dest_args =
-                            args_a.iter().map(name_arg).collect::<Vec<_>>().join(", ");
+                        let mut dest_args = args_a
+                            .iter()
+                            .map(|arg| {
+                                if args_a.contains(arg) {
+                                    arg.to_string().to_lowercase()
+                                } else {
+                                    format!("_{}", arg.to_string().to_lowercase())
+                                }
+                            })
+                            .collect::<Vec<_>>()
+                            .join(", ");
 
                         if args_a.len() == 1 {
                             dest_args = format!("{}, ()", dest_args);
@@ -182,7 +198,7 @@ pub fn generate_skeleton_datafrog(decls: &str, text: &str, output: &mut String) 
                     //   the multiple-step join
                     // - the rule's conclusion when we're on the last step
                     let dest_predicate = if is_last_step {
-                        rule.head.predicate.clone()
+                        rule.head.predicate.to_string()
                     } else {
                         format!(
                             "{}_step_{}_{}",
@@ -198,39 +214,39 @@ pub fn generate_skeleton_datafrog(decls: &str, text: &str, output: &mut String) 
                     // The arguments to the source literals can either come from the
                     // first 2 literals in the body (at the firs step of the join),
                     // or from the previous step's result and current step's literal.
-                    let args_a = if let Some(ref mut previous_step) = previous_step {
+                    let args_a: Vec<String> = if let Some(ref mut previous_step) = previous_step {
                         previous_step
                             .key
                             .iter()
                             .chain(previous_step.args.iter())
-                            .map(|&v| v)
+                            .map(|v| v.to_string())
                             .collect()
                     } else {
-                        body[0].args.clone()
+                        body[0].args.iter().map(|a| a.to_string()).collect()
                     };
 
-                    let args_b = &literal.args;
+                    let args_b: Vec<_> = literal.args.iter().map(|a| a.to_string()).collect();
 
                     // The join key is the shared variables between the 2 relations
                     let mut key: Vec<_> = args_b
                         .iter()
-                        .filter(|&v| args_a.contains(v))
-                        .map(|&v| v)
+                        .map(|v| v.to_string())
+                        .filter(|v| args_a.contains(v))
                         .collect();
 
                     // We now need to know which arguments were not used in the key: they will be the
                     // arguments that the datafrog closure producing the tuples of the join
                     // will _receive_.
-                    let is_arg_used_later = |arg, skip| {
+                    let is_arg_used_later = |arg: &str, skip| {
                         // if the argument is used in later steps, we need to retain it
                         for literal in body.iter().skip(skip) {
-                            if literal.args.contains(arg) {
+                            if literal.args.iter().any(|a| &a.to_string() == arg) {
                                 return true;
                             }
                         }
 
                         // similarly, if the variable is produced by the join process itself
-                        if rule.head.args.contains(arg) {
+                        if rule.head.args.iter().any(|a| &a.to_string() == arg) {
                             return true;
                         }
 
@@ -238,24 +254,24 @@ pub fn generate_skeleton_datafrog(decls: &str, text: &str, output: &mut String) 
                         false
                     };
 
-                    let remaining_args_a: Vec<_> = args_a
+                    let remaining_args_a: Vec<String> = args_a
                         .iter()
                         .filter(|v| !key.contains(v))
                         .filter(|v| is_arg_used_later(v, step_idx + 1))
-                        .map(|&v| v)
+                        .map(|v| v.to_string())
                         .collect();
-                    let remaining_args_b: Vec<_> = args_b
+                    let remaining_args_b: Vec<String> = args_b
                         .iter()
                         .filter(|v| !key.contains(v))
                         .filter(|v| is_arg_used_later(v, step_idx + 1))
-                        .map(|&v| v)
+                        .map(|v| v.to_string())
                         .collect();
 
                     // This step's arguments, which will be used by the next step when computing
                     // its join key.
                     let mut args = Vec::new();
-                    for &arg in remaining_args_a.iter().chain(remaining_args_b.iter()) {
-                        args.push(arg);
+                    for arg in remaining_args_a.iter().chain(remaining_args_b.iter()) {
+                        args.push(arg.clone());
                     }
 
                     // Compute the source predicates:
@@ -274,7 +290,7 @@ pub fn generate_skeleton_datafrog(decls: &str, text: &str, output: &mut String) 
                         previous_step.dest_predicate.clone()
                     } else {
                         if remaining_args_a.is_empty() {
-                            body[0].predicate.clone()
+                            body[0].predicate.to_string()
                         } else {
                             generate_index_relation(
                                 &decls,
@@ -292,7 +308,7 @@ pub fn generate_skeleton_datafrog(decls: &str, text: &str, output: &mut String) 
                     };
 
                     let mut src_b = if remaining_args_b.is_empty() {
-                        literal.predicate.clone()
+                        literal.predicate.to_string()
                     } else {
                         generate_index_relation(
                             &decls,
@@ -319,30 +335,32 @@ pub fn generate_skeleton_datafrog(decls: &str, text: &str, output: &mut String) 
                         // A self join with the same ordering would be a no-op, so look for the element
                         // which has the canonical ordering
 
-                        let canonical_args =
-                            decls[&src_a].iter().map(|decl| decl.name.to_uppercase());
+                        let canonical_args = decls[&src_a]
+                            .parameters
+                            .iter()
+                            .map(|decl| decl.name.to_string().to_uppercase());
                         let canonicalized_args_a = args_a.iter().map(|arg| arg.to_string());
                         if canonicalized_args_a.eq(canonical_args) {
                             // The left element has the canonical ordering, the right element needs to be indexed
                             // in a new wrapped-tuple relation
 
-                            let relation_args = args_b;
+                            let relation_args = &args_b;
                             let value_args = Vec::new();
 
                             let index_relation = generate_index_relation_name(
                                 &decls,
                                 &literal.predicate,
                                 &args_a,
-                                &relation_args,
+                                relation_args,
                             );
 
                             // Index maintenance
-                            if extensional.contains(&literal.predicate) {
+                            if extensional.contains(&literal.predicate.to_string()) {
                                 record_extensional_index_use(
                                     &decls,
                                     &literal.predicate,
                                     &index_relation,
-                                    &relation_args,
+                                    relation_args,
                                     &args_a,
                                     &value_args,
                                     &mut extensional,
@@ -374,7 +392,7 @@ pub fn generate_skeleton_datafrog(decls: &str, text: &str, output: &mut String) 
                     // will fill them. When we're at the last step, we produce what the rule
                     // asked us to produce in the first place.
                     let dest_args = if is_last_step {
-                        rule.head.args.clone()
+                        rule.head.args.iter().map(|a| a.to_string()).collect()
                     } else {
                         Vec::new()
                     };
@@ -432,11 +450,12 @@ pub fn generate_skeleton_datafrog(decls: &str, text: &str, output: &mut String) 
             Operation::StaticMap() => {
                 // The encoding of these predicates consumed as keys requires to
                 // wrap the key-value tuple as a key in another tuple, and a unit value.
-                let produced_tuple = if predicates_consumed_as_keys.contains(&rule.head.predicate) {
-                    "map(|&tuple| (tuple, ()))"
-                } else {
-                    "clone()"
-                };
+                let produced_tuple =
+                    if predicates_consumed_as_keys.contains(&rule.head.predicate.to_string()) {
+                        "map(|&tuple| (tuple, ()))"
+                    } else {
+                        "clone()"
+                    };
 
                 let operation = format!(
                     "{}.extend({}.iter().{});\n",
@@ -459,11 +478,12 @@ pub fn generate_skeleton_datafrog(decls: &str, text: &str, output: &mut String) 
 
                 // The encoding of these predicates consumed as keys requires to
                 // wrap the key-value tuple as a key in another tuple, and a unit value.
-                let src_args = if predicates_consumed_as_keys.contains(&rule.head.predicate) {
-                    format!("({}), _", step.src_args)
-                } else {
-                    step.src_args
-                };
+                let src_args =
+                    if predicates_consumed_as_keys.contains(&rule.head.predicate.to_string()) {
+                        format!("({}), _", step.src_args)
+                    } else {
+                        step.src_args
+                    };
 
                 let operation = format!(
                     "{dest}.from_map(&{src}, |&({src_args})| ({dest_args}));",
@@ -650,11 +670,11 @@ pub fn generate_skeleton_datafrog(decls: &str, text: &str, output: &mut String) 
 
 fn generate_skeleton_code(
     output: &mut String,
-    decls: FxHashMap<String, Vec<ArgDecl>>,
+    decls: HashMap<String, ast::PredicateDecl>,
     extensional_predicates: Vec<String>,
-    extensional_indices: FxHashMap<String, (&String, String)>,
+    extensional_indices: FxHashMap<String, (&syn::Ident, String)>,
     intensional_predicates: Vec<String>,
-    intensional_indices: FxHashMap<String, (&Literal<'_>, Vec<&str>, Vec<&str>)>,
+    intensional_indices: FxHashMap<String, (&ast::Literal, Vec<String>, Vec<String>)>,
     predicates_consumed_as_keys: FxHashSet<String>,
     main_relation_candidates: Vec<String>,
     generated_code_static_input: Vec<String>,
@@ -668,8 +688,9 @@ fn generate_skeleton_code(
         if let Some(arg_decls) = decls.get(relation) {
             // This is one the initial extensional predicates
             let arg_types: Vec<_> = arg_decls
+                .parameters
                 .iter()
-                .map(|decl| decl.rust_type.as_ref())
+                .map(|decl| decl.typ_as_string())
                 .collect();
 
             let arg_types = if predicates_consumed_as_keys.contains(relation) {
@@ -736,8 +757,9 @@ fn generate_skeleton_code(
         if let Some(arg_decls) = decls.get(variable) {
             // This is one of the initial intensional predicates
             let arg_types: Vec<_> = arg_decls
+                .parameters
                 .iter()
-                .map(|decl| decl.rust_type.as_ref())
+                .map(|decl| decl.typ_as_string())
                 .collect();
 
             // The encoding of these predicates consumed as keys requires to
@@ -765,18 +787,21 @@ fn generate_skeleton_code(
                 original_predicate = original_predicate,
             )?;
 
+            let arg_names = original_literal
+                .args
+                .iter()
+                .map(|a| a.to_string())
+                .collect();
             let key_types: Vec<_> = key
                 .iter()
                 .map(|v| {
-                    canonicalize_arg_type(&decls, original_predicate, &original_literal.args, v)
-                        .to_string()
+                    canonicalize_arg_type(&decls, original_predicate, &arg_names, v).to_string()
                 })
                 .collect();
             let args_types: Vec<_> = args
                 .iter()
                 .map(|v| {
-                    canonicalize_arg_type(&decls, original_predicate, &original_literal.args, v)
-                        .to_string()
+                    canonicalize_arg_type(&decls, original_predicate, &arg_names, v).to_string()
                 })
                 .collect();
 
@@ -818,14 +843,19 @@ fn generate_skeleton_code(
     writeln!(output, "    // Index maintenance")?;
     for (index_relation, (indexed_literal, key, args)) in intensional_indices.iter() {
         let original_relation = &indexed_literal.predicate;
-        let arg_decls = &decls[original_relation];
-        let arg_names: Vec<_> = arg_decls.iter().map(|decl| decl.name.as_ref()).collect();
+        let arg_decls = &decls[&original_relation.to_string()];
+        let arg_names: Vec<_> = arg_decls
+            .parameters
+            .iter()
+            .map(|decl| decl.name.to_string())
+            .collect();
 
         // The encoding of these predicates consumed as keys is a tuple
         // wrapping the key-value tuple as a key in another tuple, and a unit value, so we need to
         // take care of the unit value to correctly read the source tuples.
         let relation_args = join_args_as_tuple(&arg_names, &key, &args);
-        let relation_args = if predicates_consumed_as_keys.contains(original_relation) {
+        let relation_args = if predicates_consumed_as_keys.contains(&original_relation.to_string())
+        {
             format!("({}, _)", relation_args)
         } else {
             relation_args
@@ -868,22 +898,22 @@ fn generate_skeleton_code(
 }
 
 fn generate_index_relation<'a>(
-    decls: &FxHashMap<String, Vec<ArgDecl>>,
-    literal: &'a Literal<'a>,     // the literal being indexed
-    relation_args: &Vec<&'a str>, // the order and names of the arguments of the index
-    key_args: &Vec<&'a str>,      // the arguments used in the index key
-    value_args: &Vec<&'a str>,    // the arguments used in the index value
+    decls: &HashMap<String, ast::PredicateDecl>,
+    literal: &'a ast::Literal,   // the literal being indexed
+    relation_args: &Vec<String>, // the order and names of the arguments of the index
+    key_args: &Vec<String>,      // the arguments used in the index key
+    value_args: &Vec<String>,    // the arguments used in the index value
     extensional_predicates: &mut FxHashSet<String>,
-    extensional_indices: &mut FxHashMap<String, (&'a String, String)>,
+    extensional_indices: &mut FxHashMap<String, (&'a syn::Ident, String)>,
     intensional_predicates: &mut FxHashSet<String>,
     intensional_inputs: &mut FxHashSet<String>,
-    intensional_indices: &mut FxHashMap<String, (&Literal<'a>, Vec<&'a str>, Vec<&'a str>)>,
+    intensional_indices: &mut FxHashMap<String, (&'a ast::Literal, Vec<String>, Vec<String>)>,
 ) -> String {
     let index_relation =
         generate_index_relation_name(&decls, &literal.predicate, &key_args, &relation_args);
 
     // Index maintenance
-    if extensional_predicates.contains(&literal.predicate) {
+    if extensional_predicates.contains(&literal.predicate.to_string()) {
         record_extensional_index_use(
             decls,
             &literal.predicate,
@@ -923,14 +953,14 @@ fn record_predicate_use(
 }
 
 fn record_extensional_index_use<'a>(
-    decls: &FxHashMap<String, Vec<ArgDecl>>,
-    origin_predicate: &'a String, // the relation over which the index relation maps
-    index_predicate: &str,        // the index relation
-    index_args: &Vec<&str>,       // the index arguments name and order
-    key_args: &Vec<&str>,         // the indexed arguments used in the "key"
-    value_args: &Vec<&str>,       // the indexed arguments used in the "value"
+    decls: &HashMap<String, ast::PredicateDecl>,
+    origin_predicate: &'a syn::Ident, // the relation over which the index relation maps
+    index_predicate: &str,            // the index relation
+    index_args: &Vec<String>,         // the index arguments name and order
+    key_args: &Vec<String>,           // the indexed arguments used in the "key"
+    value_args: &Vec<String>,         // the indexed arguments used in the "value"
     extensional_predicates: &mut FxHashSet<String>,
-    extensional_indices: &mut FxHashMap<String, (&'a String, String)>,
+    extensional_indices: &mut FxHashMap<String, (&'a syn::Ident, String)>,
 ) {
     // Canonicalize the types of the keys and value arguments
     let key_types: Vec<_> = key_args
@@ -950,17 +980,17 @@ fn record_extensional_index_use<'a>(
 }
 
 fn record_intensional_index_use<'a>(
-    literal: &'a Literal<'a>,
-    key_args: &Vec<&'a str>,
-    value_args: &Vec<&'a str>,
+    literal: &'a ast::Literal,
+    key_args: &Vec<String>,
+    value_args: &Vec<String>,
     index_relation: &str,
     intensional_predicates: &mut FxHashSet<String>,
     intensional_inputs: &mut FxHashSet<String>,
-    intensional_indices: &mut FxHashMap<String, (&Literal<'a>, Vec<&'a str>, Vec<&'a str>)>,
+    intensional_indices: &mut FxHashMap<String, (&'a ast::Literal, Vec<String>, Vec<String>)>,
 ) {
     // When using an index, we're effectively using both `Variables`
     intensional_predicates.insert(index_relation.to_string());
-    intensional_inputs.insert(literal.predicate.clone());
+    intensional_inputs.insert(literal.predicate.to_string());
 
     intensional_indices.insert(
         index_relation.to_string(),
@@ -969,18 +999,18 @@ fn record_intensional_index_use<'a>(
 }
 
 fn find_arg_decl<'a>(
-    global_decls: &'a FxHashMap<String, Vec<ArgDecl>>,
-    predicate: &str,
-    args: &Vec<&str>,
+    global_decls: &'a HashMap<String, ast::PredicateDecl>,
+    predicate: &syn::Ident,
+    args: &Vec<String>,
     variable: &str,
-) -> &'a ArgDecl {
+) -> &'a ast::ParamDecl {
     let idx = args
         .iter()
-        .position(|&arg| arg == variable)
+        .position(|arg| arg == variable)
         .expect("Couldn't find specified `variable` in the specified `args`");
 
-    let predicate_arg_decls = &global_decls[predicate];
-    let arg_decl = &predicate_arg_decls[idx];
+    let predicate_arg_decls = &global_decls[&predicate.to_string()];
+    let arg_decl = &predicate_arg_decls.parameters[idx];
     arg_decl
 }
 
@@ -988,13 +1018,16 @@ fn find_arg_decl<'a>(
 // For example, when indexing `outlives(o1, o2, p)` via `outlives(o2, o3, p)` in a join,
 // we need to map the local names in the join to their original relation names and order,
 // to find that the index's `(o2, o3, p)` is mapping over `(o1, o2, p)`.
-fn canonicalize_arg_name<'a>(
-    global_decls: &'a FxHashMap<String, Vec<ArgDecl>>,
-    predicate: &str,
-    args: &Vec<&str>,
+fn canonicalize_arg_name(
+    global_decls: &HashMap<String, ast::PredicateDecl>,
+    predicate: &syn::Ident,
+    args: &Vec<String>,
     variable: &str,
-) -> &'a str {
-    &find_arg_decl(global_decls, predicate, args, variable).name
+) -> String {
+    find_arg_decl(global_decls, predicate, args, variable)
+        .name
+        .to_string()
+        .to_lowercase()
 }
 
 // Find the canonical types of arguments via their usage in the indexed relation.
@@ -1003,24 +1036,27 @@ fn canonicalize_arg_name<'a>(
 // to find that the index's `(o2, o3, p)` is mapping over `(o1, o2, p)`, to finally find
 // these canonical arguments' types and generate a `Relation<(Origin, Origin, Point)>`.
 fn canonicalize_arg_type<'a>(
-    global_decls: &'a FxHashMap<String, Vec<ArgDecl>>,
-    predicate: &str,
-    args: &Vec<&str>,
+    global_decls: &'a HashMap<String, ast::PredicateDecl>,
+    predicate: &syn::Ident,
+    args: &Vec<String>,
     variable: &str,
-) -> &'a str {
-    &find_arg_decl(global_decls, predicate, args, variable).rust_type
+) -> String {
+    find_arg_decl(global_decls, predicate, args, variable)
+        .typ
+        .to_token_stream()
+        .to_string()
 }
 
 fn generate_index_relation_name(
-    decls: &FxHashMap<String, Vec<ArgDecl>>,
-    predicate: &str,
-    key: &Vec<&str>,
-    args: &Vec<&str>,
+    decls: &HashMap<String, ast::PredicateDecl>,
+    predicate: &syn::Ident,
+    key: &Vec<String>,
+    args: &Vec<String>,
 ) -> String {
     let mut index_args = String::new();
-    for &v in key.iter() {
+    for v in key {
         let idx_key = canonicalize_arg_name(&decls, predicate, &args, v);
-        index_args.push_str(&idx_key);
+        index_args.push_str(&idx_key.to_string());
     }
 
     format!("{}_{}", predicate, index_args)
@@ -1030,15 +1066,15 @@ fn generate_index_relation_name(
 /// with _ to avoid generating a warning when it's not actually used
 /// to produce the tuple, and potentially "untupled" if there's only one.
 fn join_args_as_tuple(
-    variables: &Vec<&str>,
-    uses_key: &Vec<&str>,
-    uses_args: &Vec<&str>,
+    variables: &Vec<String>,
+    uses_key: &Vec<String>,
+    uses_args: &Vec<String>,
 ) -> String {
     let name_arg = |arg| {
         if uses_key.contains(arg)
-            || uses_key.contains(&arg.to_uppercase().as_ref())
+            || uses_key.contains(&arg.to_uppercase())
             || uses_args.contains(arg)
-            || uses_args.contains(&arg.to_uppercase().as_ref())
+            || uses_args.contains(&arg.to_uppercase())
         {
             arg.to_string().to_lowercase()
         } else {

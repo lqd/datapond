@@ -2,40 +2,38 @@ use datapond::generate_skeleton_datafrog;
 
 #[test]
 fn generate_flow_sensitive_equality_rules() {
-    let decls = r#"
-        .decl borrow_region(O: Origin, L: Loan, P: Point)
-        .decl cfg_edge(P: Point, Q: Point)
-        .decl killed(L: Loan, P: Point)
-        .decl outlives(O1: Origin, O2: Origin, P: Point)
-        .decl region_live_at(O: Origin, P: Point)
-        .decl subset(O1: Origin, O2: Origin, P: Point)
-        .decl requires(O: Origin, L: Loan, P: Point)
-        .decl borrow_live_at(L: Loan, P: Point)
-        .decl invalidates(L: Loan, P: Point)
-        .decl errors(L: Loan, P: Point)
-        .decl equals(O1: Origin, O2: Origin, P: Point)
-    "#;
+    let text = r#"
+        input borrow_region(O: Origin, L: Loan, P: Point)
+        input cfg_edge(P: Point, Q: Point)
+        input killed(L: Loan, P: Point)
+        input outlives(O1: Origin, O2: Origin, P: Point)
+        input region_live_at(O: Origin, P: Point)
+        internal subset(O1: Origin, O2: Origin, P: Point)
+        internal requires(O: Origin, L: Loan, P: Point)
+        internal borrow_live_at(L: Loan, P: Point)
+        input invalidates(L: Loan, P: Point)
+        internal errors(L: Loan, P: Point)
+        internal equals(O1: Origin, O2: Origin, P: Point)
 
-    let rules = r#"
         // R1
         subset(O1, O2, P) :-
           outlives(O1, O2, P).
 
         // R2
-        subset(O1, O3, P) :- 
-          subset(O1, O2, P), 
+        subset(O1, O3, P) :-
+          subset(O1, O2, P),
           outlives(O2, O3, P).
-        
+
         // R3
         equals(O1, O2, P) :-
-          subset(O1, O2, P), 
+          subset(O1, O2, P),
           subset(O2, O1, P).
 
         // R4
         equals(O1, O3, P) :-
           equals(O1, O2, P),
           equals(O2, O3, P).
-        
+
         // R5
         equals(O1, O2, Q) :-
           equals(O1, O2, P),
@@ -49,34 +47,34 @@ fn generate_flow_sensitive_equality_rules() {
           equals(O1, O2, P).
 
         // R7
-        requires(O, L, P) :- 
+        requires(O, L, P) :-
           borrow_region(O, L, P).
 
         // R8
-        requires(O2, L, P) :- 
+        requires(O2, L, P) :-
           requires(O1, L, P),
           subset(O1, O2, P).
-    
+
         // R9
-        requires(O, L, Q) :- 
-          requires(O, L, P), 
-          !killed(L, P), 
-          cfg_edge(P, Q), 
+        requires(O, L, Q) :-
+          requires(O, L, P),
+          !killed(L, P),
+          cfg_edge(P, Q),
           region_live_at(O, Q).
 
         // R10
-        borrow_live_at(L, P) :- 
-          requires(O, L, P), 
+        borrow_live_at(L, P) :-
+          requires(O, L, P),
           region_live_at(O, P).
 
         // R11
-        errors(L, P) :- 
+        errors(L, P) :-
           borrow_live_at(L, P),
           invalidates(L, P).
     "#;
 
     let mut output = String::new();
-    generate_skeleton_datafrog(decls, rules, &mut output);
+    generate_skeleton_datafrog(text, &mut output);
 
     let expected = r#"
 // Extensional predicates, and their indices

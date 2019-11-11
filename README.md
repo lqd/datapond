@@ -27,16 +27,16 @@ In the Polonius context, this was used to bootstrap the `Naive` rules variant (t
 Using a set of declarations like these:
 
 ```prolog
-.decl borrow_region(O: Origin, L: Loan, P: Point)
-.decl cfg_edge(P: Point, Q: Point)
-.decl killed(L: Loan, P: Point)
-.decl outlives(O1: Origin, O2: Origin, P: Point)
-.decl region_live_at(O: Origin, P: Point)
-.decl subset(O1: Origin, O2: Origin, P: Point)
-.decl requires(O: Origin, L: Loan, P: Point)
-.decl borrow_live_at(L: Loan, P: Point)
-.decl invalidates(L: Loan, P: Point)
-.decl errors(L: Loan, P: Point)
+input borrow_region(O: Origin, L: Loan, P: Point)
+input cfg_edge(P: Point, Q: Point)
+input killed(L: Loan, P: Point)
+input outlives(O1: Origin, O2: Origin, P: Point)
+input region_live_at(O: Origin, P: Point)
+internal subset(O1: Origin, O2: Origin, P: Point)
+internal requires(O: Origin, L: Loan, P: Point)
+internal borrow_live_at(L: Loan, P: Point)
+input invalidates(L: Loan, P: Point)
+output errors(L: Loan, P: Point)
 ```
 
 And the `Naive` polonius rules:
