@@ -1,6 +1,6 @@
-mod datalog;
+mod ast;
 mod generator;
 mod parser;
+mod typechecker;
 
-pub(crate) use datalog::*;
 pub use generator::generate_skeleton_datafrog;

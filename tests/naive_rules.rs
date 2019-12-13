@@ -2,20 +2,18 @@ use datapond::generate_skeleton_datafrog;
 
 #[test]
 fn generate_naive_rules() {
-    let decls = r#"
-            .decl borrow_region(O: Origin, L: Loan, P: Point)
-            .decl cfg_edge(P: Point, Q: Point)
-            .decl killed(L: Loan, P: Point)
-            .decl outlives(O1: Origin, O2: Origin, P: Point)
-            .decl region_live_at(O: Origin, P: Point)
-            .decl subset(O1: Origin, O2: Origin, P: Point)
-            .decl requires(O: Origin, L: Loan, P: Point)
-            .decl borrow_live_at(L: Loan, P: Point)
-            .decl invalidates(L: Loan, P: Point)
-            .decl errors(L: Loan, P: Point)
-        "#;
+    let text = r#"
+            input borrow_region(O: Origin, L: Loan, P: Point)
+            input cfg_edge(P: Point, Q: Point)
+            input killed(L: Loan, P: Point)
+            input outlives(O1: Origin, O2: Origin, P: Point)
+            input region_live_at(O: Origin, P: Point)
+            internal subset(O1: Origin, O2: Origin, P: Point)
+            internal requires(O: Origin, L: Loan, P: Point)
+            internal borrow_live_at(L: Loan, P: Point)
+            input invalidates(L: Loan, P: Point)
+            output errors(L: Loan, P: Point)
 
-    let rules = r#"
             subset(O1, O2, P)    :- outlives(O1, O2, P).
             subset(O1, O3, P)    :- subset(O1, O2, P), subset(O2, O3, P).
             subset(O1, O2, Q)    :- subset(O1, O2, P), cfg_edge(P, Q), region_live_at(O1, Q), region_live_at(O2, Q).
@@ -27,7 +25,7 @@ fn generate_naive_rules() {
         "#;
 
     let mut output = String::new();
-    generate_skeleton_datafrog(decls, rules, &mut output);
+    generate_skeleton_datafrog(text, &mut output);
 
     let expected = r#"
 // Extensional predicates, and their indices
