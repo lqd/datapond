@@ -8,12 +8,12 @@ fn generate_flow_sensitive_equality_rules() {
         input killed(L: Loan, P: Point)
         input outlives(O1: Origin, O2: Origin, P: Point)
         input region_live_at(O: Origin, P: Point)
+        input invalidates(L: Loan, P: Point)
         internal subset(O1: Origin, O2: Origin, P: Point)
         internal requires(O: Origin, L: Loan, P: Point)
         internal borrow_live_at(L: Loan, P: Point)
-        input invalidates(L: Loan, P: Point)
-        internal errors(L: Loan, P: Point)
         internal equals(O1: Origin, O2: Origin, P: Point)
+        output errors(L: Loan, P: Point)
 
         // R1
         subset(O1, O2, P) :-
