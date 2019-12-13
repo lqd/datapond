@@ -471,7 +471,7 @@ pub fn generate_skeleton_datafrog(text: &str, output: &mut String) {
                 ));
             }
             Operation::DynamicMap(step) => {
-                eprintln!(
+                warn!(
                     "warning: untested code generation! dynamic map step: {:?}",
                     step
                 );

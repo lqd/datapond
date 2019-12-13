@@ -190,7 +190,7 @@ impl Parse for ast::Program {
 
 /// Parse a Datalog program.
 pub(crate) fn parse(text: &str) -> ast::Program {
-    eprintln!("text: {}", text);
+    info!("parse text: {}", text);
     match syn::parse_str(text) {
         Ok(program) => program,
         Err(err) => panic!("Error: {:?} (at {:?})", err, err.span().start()),
