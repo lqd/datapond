@@ -1,6 +1,11 @@
+use std::env;
 use datapond;
 
 fn main() {
+    if env::var("RUST_LOG").is_ok() {
+        start_logging().expect("Initializing logger failed");
+    }
+
     let text = r#"
         input borrow_region(O: Origin, L: Loan, P: Point)
         input cfg_edge(P: Point, Q: Point)
@@ -66,4 +71,28 @@ fn main() {
     let mut output = String::new();
     datapond::generate_skeleton_datafrog(text, &mut output);
     println!("{}", output);
+}
+
+use log::{Level, LevelFilter, Metadata, Record, SetLoggerError};
+
+struct Logger;
+
+impl log::Log for Logger {
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        metadata.level() <= Level::Info
+    }
+
+    fn log(&self, record: &Record) {
+        if self.enabled(record.metadata()) {
+            eprintln!("{} {} - {}", record.level(), record.target(), record.args());
+        }
+    }
+
+    fn flush(&self) {}
+}
+
+static LOGGER: Logger = Logger;
+
+fn start_logging() -> Result<(), SetLoggerError> {
+    log::set_logger(&LOGGER).map(|()| log::set_max_level(LevelFilter::Info))
 }
