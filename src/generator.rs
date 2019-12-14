@@ -809,7 +809,7 @@ fn generate_skeleton_code(
             // wrap the key-value tuple as a key in another tuple, and a unit value.
             let variable_type = join_types_as_tuple(key_types, args_types);
             let variable_type = if predicates_consumed_as_keys.contains(variable) {
-                format!("({}), ()", variable_type)
+                format!("{}, ()", variable_type)
             } else {
                 variable_type
             };
