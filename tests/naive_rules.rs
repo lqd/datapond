@@ -1,4 +1,5 @@
 use datapond::generate_skeleton_datafrog;
+use pretty_assertions::assert_eq;
 
 #[test]
 fn generate_naive_rules() {
