@@ -448,14 +448,45 @@ pub fn generate_skeleton_datafrog(text: &str, output: &mut String) {
 
         match operation {
             Operation::StaticMap() => {
-                // The encoding of these predicates consumed as keys requires to
+                // A `map` operation depends on:
+                // - whether the predicate was consumed as a key, where we can simply
+                //   wrap the tuple
+                // - whether body already projects to what the rule expects, where we can simply
+                //   clone the input
+                // - all the other cases, where we'll do the projection of the input relation
+
+                // static `map` operations are composed of a projection of a single relation
+                assert!(rule.body.len() == 1);
+
+                let projection_matches_head = rule
+                    .head
+                    .args
+                    .iter()
+                    .eq(rule.body[0].args.iter().map(|x| x.ident()));
+
+                // The encoding of predicates consumed as keys requires to
                 // wrap the key-value tuple as a key in another tuple, and a unit value.
-                let produced_tuple =
-                    if predicates_consumed_as_keys.contains(&rule.head.predicate.to_string()) {
-                        "map(|&tuple| (tuple, ()))"
-                    } else {
-                        "clone()"
-                    };
+                let produced_tuple = if predicates_consumed_as_keys
+                    .contains(&rule.head.predicate.to_string())
+                {
+                    "map(|&tuple| (tuple, ()))".to_string()
+                } else if projection_matches_head {
+                    // If the projection matches the head of the rule, we can simply clone the input
+                    // (as the arguments are the same).
+                    "clone()".to_string()
+                } else {
+                    // If the body arguments do not match the head of the rule, we need to `map` over
+                    // the input to project what the rule expects to output.
+                    let source_args: Vec<_> =
+                        rule.body[0].args.iter().map(|a| a.to_string()).collect();
+                    let target_args: Vec<_> =
+                        rule.head.args.iter().map(|a| a.to_string()).collect();
+
+                    let tupled_src = join_args_as_tuple(&source_args, &target_args, &target_args);
+                    let tupled_target =
+                        join_args_as_tuple(&target_args, &target_args, &target_args);
+                    format!("map(|&{}| {})", tupled_src, tupled_target)
+                };
 
                 let operation = format!(
                     "{}.extend({}.iter().{});\n",
