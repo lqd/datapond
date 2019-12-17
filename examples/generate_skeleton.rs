@@ -68,8 +68,7 @@ fn main() {
           invalidates(L, P).
     "#;
 
-    let mut output = String::new();
-    datapond::generate_skeleton_datafrog(text, &mut output);
+    let output = datapond::generate_skeleton_datafrog(text);
     println!("{}", output);
 }
 

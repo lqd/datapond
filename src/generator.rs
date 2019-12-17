@@ -48,7 +48,16 @@ struct MapStep {
     dest_args: String,
 }
 
-pub fn generate_skeleton_datafrog(text: &str, output: &mut String) {
+pub fn generate_skeleton_datafrog(text: &str) -> String {
+    let mut output = String::new();
+    generate_skeleton_into(text, &mut output);
+
+    // tidy up: filter multiple empty lines in a row
+    let filtered = output.replace("\n\n\n", "\n\n");
+    filtered
+}
+
+fn generate_skeleton_into(text: &str, output: &mut String) {
     // Step 0: parse everything.
     let program = parser::parse(text);
     let program = match typechecker::typecheck(program) {
@@ -489,7 +498,7 @@ pub fn generate_skeleton_datafrog(text: &str, output: &mut String) {
                 };
 
                 let operation = format!(
-                    "{}.extend({}.iter().{});\n",
+                    "{}.extend({}.iter().{});",
                     rule.head.predicate, rule.body[0].predicate, produced_tuple
                 );
 
@@ -863,8 +872,15 @@ fn generate_skeleton_code(
 
     // Initial data loading
     writeln!(output, "")?;
-    for line in generated_code_static_input {
-        writeln!(output, "{}", line)?;
+    for data_loading_operation in generated_code_static_input.chunks(2) {
+        // Static data-loading generates pairs of lines:
+        // - a comment describing the rule the data-loading operation is for
+        // - the data-loading operation itself: the code creating a datafrog `Relation`
+        let rule_comment = &data_loading_operation[0];
+        writeln!(output, "{}", rule_comment)?;
+
+        let code = &data_loading_operation[1];
+        writeln!(output, "{}\n", code)?;
     }
 
     writeln!(output, "while iteration.changed() {{")?;

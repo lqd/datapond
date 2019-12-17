@@ -74,8 +74,7 @@ fn generate_flow_sensitive_equality_rules() {
           invalidates(L, P).
     "#;
 
-    let mut output = String::new();
-    generate_skeleton_datafrog(text, &mut output);
+    let output = generate_skeleton_datafrog(text);
 
     let expected = r#"
 // Extensional predicates, and their indices

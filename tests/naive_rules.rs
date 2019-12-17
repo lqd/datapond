@@ -25,8 +25,7 @@ fn generate_naive_rules() {
             errors(L, P)         :- borrow_live_at(L, P), invalidates(L, P).
         "#;
 
-    let mut output = String::new();
-    generate_skeleton_datafrog(text, &mut output);
+    let output = generate_skeleton_datafrog(text);
 
     let expected = r#"
 // Extensional predicates, and their indices
