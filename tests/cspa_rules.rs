@@ -3,7 +3,7 @@ use pretty_assertions::assert_eq;
 
 #[test]
 fn generate_cspa_rules() {
-    // Context-sensitive Point-to Analysis rules
+    // Context-sensitive Points-to Analysis rules
     // adapted from http://pages.cs.wisc.edu/~aws/papers/vldb19.pdf p. 9
 
     let text = r#"
