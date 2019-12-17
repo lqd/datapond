@@ -243,8 +243,13 @@ where
         // Note: `equals_o1p` is an indexed version of the `equals` relation
         let equals_o1p = iteration.variable::<((Origin, Point), Origin)>("equals_o1p");
 
+        // Note: `equals_o2p` is an indexed version of the `equals` relation
+        let equals_o2p = iteration.variable::<((Origin, Point), Origin)>("equals_o2p");
+
         // Note: `equals_p` is an indexed version of the `equals` relation
         let equals_p = iteration.variable::<(Point, (Origin, Origin))>("equals_p");
+        let equals_step_5_1 = iteration.variable("equals_step_5_1");
+        let equals_step_5_2 = iteration.variable("equals_step_5_2");
         let errors = iteration.variable::<(Loan, Point)>("errors");
         let requires = iteration.variable::<(Origin, Loan, Point)>("requires");
 
@@ -253,8 +258,8 @@ where
 
         // Note: `requires_op` is an indexed version of the `requires` relation
         let requires_op = iteration.variable::<((Origin, Point), Loan)>("requires_op");
-        let requires_step_8_1 = iteration.variable("requires_step_8_1");
-        let requires_step_8_2 = iteration.variable("requires_step_8_2");
+        let requires_step_9_1 = iteration.variable("requires_step_9_1");
+        let requires_step_9_2 = iteration.variable("requires_step_9_2");
         let subset = iteration.variable::<((Origin, Origin, Point), ())>("subset");
 
         // Note: `subset_o1p` is an indexed version of the `subset` relation
@@ -269,18 +274,19 @@ where
         // R01: subset(O1, O2, P) :- outlives(O1, O2, P).
         subset.extend(outlives.iter().map(|&tuple| (tuple, ())));
 
-        // R06: requires(O, L, P) :- borrow_region(O, L, P).
+        // R07: requires(O, L, P) :- borrow_region(O, L, P).
         requires.extend(borrow_region.iter().clone());
 
         while iteration.changed() {
             // Index maintenance
-            subset_o1p.from_map(&subset, |&((o1, o2, p), _)| ((o1, p), o2));
             equals_p.from_map(&equals, |&(o1, o2, p)| (p, (o1, o2)));
+            equals_o1p.from_map(&equals, |&(o1, o2, p)| ((o1, p), o2));
+            subset_o1p.from_map(&subset, |&((o1, o2, p), _)| ((o1, p), o2));
+            equals_o2p.from_map(&equals, |&(o1, o2, p)| ((o2, p), o1));
+            subset_o2o1p.from_map(&subset, |&((o1, o2, p), _)| ((o2, o1, p), ()));
             requires_lp.from_map(&requires, |&(o, l, p)| ((l, p), o));
             subset_o2p.from_map(&subset, |&((o1, o2, p), _)| ((o2, p), o1));
-            equals_o1p.from_map(&equals, |&(o1, o2, p)| ((o1, p), o2));
             requires_op.from_map(&requires, |&(o, l, p)| ((o, p), l));
-            subset_o2o1p.from_map(&subset, |&((o1, o2, p), _)| ((o2, o1, p), ()));
 
             // Rules
 
@@ -295,33 +301,42 @@ where
             // R03: equals(O1, O2, P) :- subset(O1, O2, P), subset(O2, O1, P).
             equals.from_join(&subset, &subset_o2o1p, |&(o1, o2, p), _, _| (o1, o2, p));
 
-            // R04: equals(O1, O2, Q) :- equals(O1, O2, P), cfg_edge(P, Q).
-            equals.from_join(&equals_p, &cfg_edge_p, |&_p, &(o1, o2), &q| (o1, o2, q));
+            // R04: equals(O1, O3, P) :- equals(O1, O2, P), equals(O2, O3, P).
+            equals.from_join(&equals_o2p, &equals_o1p, |&(_o2, p), &o1, &o3| (o1, o3, p));
 
-            // R05: requires(O2, L, P) :- requires(O1, L, P), equals(O1, O2, P).
+            // R05: equals(O1, O2, Q) :- equals(O1, O2, P), cfg_edge(P, Q), region_live_at(O1, Q), region_live_at(O2, Q).
+            equals_step_5_1.from_join(&equals_p, &cfg_edge_p, |&_p, &(o1, o2), &q| ((o1, q), o2));
+            equals_step_5_2.from_join(&equals_step_5_1, &region_live_at, |&(o1, q), &o2, _| {
+                ((o2, q), o1)
+            });
+            equals.from_join(&equals_step_5_2, &region_live_at, |&(o2, q), &o1, _| {
+                (o1, o2, q)
+            });
+
+            // R06: requires(O2, L, P) :- requires(O1, L, P), equals(O1, O2, P).
             requires.from_join(&requires_op, &equals_o1p, |&(_o1, p), &l, &o2| (o2, l, p));
 
-            // R06: requires(O, L, P) :- borrow_region(O, L, P).
+            // R07: requires(O, L, P) :- borrow_region(O, L, P).
             // `borrow_region` is a static input, already loaded into `requires`.
 
-            // R07: requires(O2, L, P) :- requires(O1, L, P), subset(O1, O2, P).
+            // R08: requires(O2, L, P) :- requires(O1, L, P), subset(O1, O2, P).
             requires.from_join(&requires_op, &subset_o1p, |&(_o1, p), &l, &o2| (o2, l, p));
 
-            // R08: requires(O, L, Q) :- requires(O, L, P), !killed(L, P), cfg_edge(P, Q), region_live_at(O, Q).
-            requires_step_8_1.from_antijoin(&requires_lp, &killed, |&(l, p), &o| (p, (l, o)));
-            requires_step_8_2.from_join(&requires_step_8_1, &cfg_edge_p, |&_p, &(l, o), &q| {
+            // R09: requires(O, L, Q) :- requires(O, L, P), !killed(L, P), cfg_edge(P, Q), region_live_at(O, Q).
+            requires_step_9_1.from_antijoin(&requires_lp, &killed, |&(l, p), &o| (p, (l, o)));
+            requires_step_9_2.from_join(&requires_step_9_1, &cfg_edge_p, |&_p, &(l, o), &q| {
                 ((o, q), l)
             });
-            requires.from_join(&requires_step_8_2, &region_live_at, |&(o, q), &l, _| {
+            requires.from_join(&requires_step_9_2, &region_live_at, |&(o, q), &l, _| {
                 (o, l, q)
             });
 
-            // R09: borrow_live_at(L, P) :- requires(O, L, P), region_live_at(O, P).
+            // R10: borrow_live_at(L, P) :- requires(O, L, P), region_live_at(O, P).
             borrow_live_at.from_join(&requires_op, &region_live_at, |&(_o, p), &l, _| {
                 ((l, p), ())
             });
 
-            // R10: errors(L, P) :- borrow_live_at(L, P), invalidates(L, P).
+            // R11: errors(L, P) :- borrow_live_at(L, P), invalidates(L, P).
             errors.from_join(&borrow_live_at, &invalidates, |&(l, p), _, _| (l, p));
         }
 
