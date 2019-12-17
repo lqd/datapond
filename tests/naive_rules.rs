@@ -155,6 +155,7 @@ where
     // `errors` inferred as the output relation
     let errors = {
         let mut iteration = Iteration::new();
+
         // Intensional predicates, and their indices
 
         let borrow_live_at = iteration.variable::<((Loan, Point), ())>("borrow_live_at");
@@ -185,7 +186,7 @@ where
         subset.extend(outlives.iter().clone());
 
         // R04: requires(O, L, P) :- borrow_region(O, L, P).
-        requires.extend(borrow_region.iter().map(|&tuple| tuple));
+        requires.extend(borrow_region.iter().clone());
 
         while iteration.changed() {
             // Index maintenance
