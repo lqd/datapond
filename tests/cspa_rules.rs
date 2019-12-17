@@ -134,7 +134,7 @@ fn ensure_generated_rules_build() {
     // shim to bring in datafrog so that the generated skeleton can build.
     use datafrog::{Iteration, Relation};
 
-    // ----- output from the skeleton generator follows below -----
+    // ----- output from the skeleton generator follows below (+ manual comments) -----
 
     // Extensional predicates, and their indices
 
@@ -188,10 +188,26 @@ fn ensure_generated_rules_build() {
     while iteration.changed() {
 
         // Index maintenance
+
+        // The generator produces, as of now, this piece of code for index maintenance:
+        //
+        //     value_flow_b.from_map(&value_flow, |&(_a, _b)| (z, x));
+        //     value_flow_a.from_map(&value_flow, |&(_a, _b)| (w, y));
+        //     value_alias_a.from_map(&value_alias, |&(_a, _b)| (y, z));
+        //     memory_alias_a.from_map(&memory_alias, |&(_a, _b)| (z, w));
+        //
+        // which is
+        // - invalid, as it references the non-canonicalized names in the produced tuple
+        // - inefficient, as the non-canonicalized arguments were recorded as uses of more indexes
+        //   than needed: all these are indexed on the first column, and that is already the case in
+        //   the original relation.
+
+        // I've manually changed the naming below until index maintenance is fixed for this
+        // case where the projections use completely different names from the parameter declarations.
         value_flow_b.from_map(&value_flow, |&(a, b)| (b, a));
-        value_flow_a.from_map(&value_flow, |&(a, b)| (a, b)); // useless
-        value_alias_a.from_map(&value_alias, |&(a, b)| (a, b)); // useless
-        memory_alias_a.from_map(&memory_alias, |&(a, b)| (a, b)); // useless
+        value_flow_a.from_map(&value_flow, |&(a, b)| (a, b)); // useless index
+        value_alias_a.from_map(&value_alias, |&(a, b)| (a, b)); // useless index
+        memory_alias_a.from_map(&memory_alias, |&(a, b)| (a, b)); // useless index
 
         // Rules
 
