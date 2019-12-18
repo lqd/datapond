@@ -890,26 +890,48 @@ fn generate_skeleton_code(
     writeln!(output, "    // Index maintenance")?;
     for (index_relation, (indexed_literal, key, args)) in intensional_indices.iter() {
         let original_relation = &indexed_literal.predicate;
+
+        let mut produced_key = join_args_as_tuple(&key, &key, &args);
+        let mut produced_args = join_args_as_tuple(&args, &key, &args);
+
         let arg_decls = &decls[&original_relation.to_string()];
-        let arg_names: Vec<_> = arg_decls
+        let declared_args: Vec<_> = arg_decls
             .parameters
             .iter()
-            .map(|decl| decl.name.to_string())
+            .map(|decl| decl.name.to_string().to_lowercase())
             .collect();
 
         // The encoding of these predicates consumed as keys is a tuple
         // wrapping the key-value tuple as a key in another tuple, and a unit value, so we need to
         // take care of the unit value to correctly read the source tuples.
-        let relation_args = join_args_as_tuple(&arg_names, &key, &args);
         let relation_args = if predicates_consumed_as_keys.contains(&original_relation.to_string())
         {
+            let relation_args = join_args_as_tuple(&declared_args, &key, &args);
             format!("({}, _)", relation_args)
         } else {
+            let arg_names: Vec<_> = indexed_literal
+                .args
+                .iter()
+                .map(|v| v.to_string())
+                .collect();
+            
+            let canonicalized_key: Vec<_> = key
+                .iter()
+                .map(|v| canonicalize_arg_name(&decls, &indexed_literal.predicate, &arg_names, v))
+                .collect();
+                
+            let canonicalized_args: Vec<_> = args
+                .iter()
+                .map(|v| canonicalize_arg_name(&decls, &indexed_literal.predicate, &arg_names, v))
+                .collect();
+                
+            produced_key = join_args_as_tuple(&canonicalized_key, &canonicalized_key, &canonicalized_args);
+            produced_args = join_args_as_tuple(&canonicalized_args, &canonicalized_key, &canonicalized_args);
+
+            let relation_args = join_args_as_tuple(&declared_args, &canonicalized_key, &canonicalized_args);
+
             relation_args
         };
-
-        let produced_key = join_args_as_tuple(&key, &key, &args);
-        let produced_args = join_args_as_tuple(&args, &key, &args);
 
         writeln!(output,
             "    {index_relation}.from_map(&{original_relation}, |&{relation_args}| ({produced_key}, {produced_args}));",
