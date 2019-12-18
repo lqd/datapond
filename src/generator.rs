@@ -1054,7 +1054,10 @@ fn find_arg_decl<'a>(
     let idx = args
         .iter()
         .position(|arg| arg == variable)
-        .expect("Couldn't find specified `variable` in the specified `args`");
+        .expect(&format!(
+            "Couldn't find variable {:?} in the specified args: {:?}",
+            variable, args
+        ));
 
     let predicate_arg_decls = &global_decls[&predicate.to_string()];
     let arg_decl = &predicate_arg_decls.parameters[idx];
