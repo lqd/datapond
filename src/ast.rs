@@ -98,6 +98,15 @@ pub enum Arg {
     Wildcard,
 }
 
+impl Arg {
+    pub fn to_ident(&self) -> syn::Ident {
+        match self {
+            Arg::Ident(ident) => ident.clone(),
+            Arg::Wildcard => syn::Ident::new("_", proc_macro2::Span::call_site()),
+        }
+    }
+}
+
 impl fmt::Display for Arg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {

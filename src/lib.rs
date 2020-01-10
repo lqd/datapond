@@ -3,6 +3,7 @@ extern crate log;
 
 mod ast;
 mod generator;
+mod generator_new;
 mod parser;
 mod typechecker;
 
