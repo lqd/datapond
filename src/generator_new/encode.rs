@@ -1,6 +1,60 @@
 use crate::ast;
 use crate::generator_new::ast as gen;
 
+/// Divide the arguments into three sets:
+///
+/// 1. `key` – the arguments that are common in `first` and `second`.
+/// 2. `first_remainder` – the arguments that are unique in `first`.
+/// 3. `second_remainder` – the arguments that are unique in `second`.
+fn common_args(
+    first: &Vec<ast::Arg>,
+    first_types: &Vec<syn::Type>,
+    second: &Vec<ast::Arg>,
+    second_types: &Vec<syn::Type>,
+) -> (
+    (Vec<ast::Arg>, Vec<syn::Type>),
+    (Vec<ast::Arg>, Vec<syn::Type>),
+    (Vec<ast::Arg>, Vec<syn::Type>),
+) {
+    assert!(first.len() == first_types.len());
+    assert!(second.len() == second_types.len());
+
+    let mut key = Vec::new();
+    let mut key_types = Vec::new();
+    let mut first_remainder = Vec::new();
+    let mut first_remainder_types = Vec::new();
+
+    for (arg1, arg1_type) in first.iter().zip(first_types) {
+        let mut found = false;
+        for arg2 in second {
+            if arg1 == arg2 {
+                key.push(arg1.clone());
+                key_types.push(arg1_type.clone());
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            first_remainder.push(arg1.clone());
+            first_remainder_types.push(arg1_type.clone());
+        }
+    }
+    let mut second_remainder = Vec::new();
+    let mut second_remainder_types = Vec::new();
+    for (arg2, arg2_type) in second.iter().zip(second_types) {
+        if !key.contains(arg2) {
+            second_remainder.push(arg2.clone());
+            second_remainder_types.push(arg2_type.clone());
+        }
+    }
+
+    (
+        (key, key_types),
+        (first_remainder, first_remainder_types),
+        (second_remainder, second_remainder_types),
+    )
+}
+
 pub(crate) fn encode(program: ast::Program) -> gen::Iteration {
     let mut relations = Vec::new();
     let mut variables = Vec::new();
@@ -35,39 +89,69 @@ pub(crate) fn encode(program: ast::Program) -> gen::Iteration {
     }
     let mut iteration = gen::Iteration::new(relations, variables);
     for rule in &program.rules {
+        let head_variable = iteration.get_variable(&rule.head.predicate);
         let mut iter = rule.body.iter();
         let literal1 = iter.next().unwrap();
         if literal1.is_negated {
             unimplemented!();
         }
-        let variable = if let Some(variable) = iteration.get_relation_var(&literal1.predicate) {
-            iteration.convert_relation_to_variable(&variable)
-        } else {
-            iteration.get_variable(&literal1.predicate)
-        };
-        let args = literal1.args.clone();
+        let mut variable = iteration.get_or_convert_variable(&literal1.predicate);
+        let mut args = literal1.args.clone();
 
-        // Retrieve the main variable for the head.
-        // Create a new variable `res` for the rule result.
-        // {
-        //  if rule.body.len() == 1 {
-        //      res.from_map(rule.body[0], ...)
-        //  } else if rule.body.len() == 2 {
-        //      let first = rule.body[0];
-        //      let second = rule.body[1];
-        //      let (key, first_remainder, second_remainder) = common_args(first, second);
-        //      let new_first = variable::<(key, first_remainder)>;
-        //      let new_second = variable::<(key, second_remainder)>;
-        //      new_first.from_map(first);
-        //      new_second.from_map(second);
-        //      res.from_join(new_first, new_second, ...)
-        //  }
-        // }
-
-        //
-        // Extend the main variable with the new variable.
-        // rule.head.extend(res);
-        let head_variable = iteration.get_variable(&rule.head.predicate);
+        while let Some(literal) = iter.next() {
+            let joined_variable = iteration.get_or_convert_variable(&literal.predicate);
+            // TODO: Check during the typechecking phase that no literal has two
+            // arguments with the same name.
+            let arg_types = iteration.get_variable_tuple_types(&variable);
+            let literal_arg_types = iteration.get_variable_tuple_types(&joined_variable);
+            let ((key, key_types), (remainder1, remainder1_types), (remainder2, remainder2_types)) =
+                common_args(&args, &arg_types, &literal.args, &literal_arg_types);
+            let first_variable = iteration.create_key_val_variable(
+                &variable,
+                key_types.clone(),
+                remainder1_types.clone(),
+            );
+            let reorder_first_op = gen::ReorderOp {
+                output: first_variable.clone(),
+                input: variable,
+                input_vars: args.into(),
+                output_vars: (key.clone(), remainder1.clone()).into(),
+            };
+            iteration.add_operation(gen::Operation::Reorder(reorder_first_op));
+            let second_variable = iteration.create_key_val_variable(
+                &joined_variable,
+                key_types.clone(),
+                remainder2_types.clone(),
+            );
+            let reorder_second_op = gen::ReorderOp {
+                output: second_variable.clone(),
+                input: joined_variable,
+                input_vars: literal.args.clone().into(),
+                output_vars: (key.clone(), remainder2.clone()).into(),
+            };
+            iteration.add_operation(gen::Operation::Reorder(reorder_second_op));
+            let result_types = key_types
+                .into_iter()
+                .chain(remainder1_types)
+                .chain(remainder2_types)
+                .collect();
+            args = key
+                .clone()
+                .into_iter()
+                .chain(remainder1.clone())
+                .chain(remainder2.clone())
+                .collect();
+            variable = iteration.create_tuple_variable(&head_variable, result_types);
+            let join_op = gen::JoinOp {
+                output: variable.clone(),
+                input_first: first_variable,
+                input_second: second_variable,
+                key: key.into(),
+                value_first: remainder1.into(),
+                value_second: remainder2.into(),
+            };
+            iteration.add_operation(gen::Operation::Join(join_op));
+        }
         let reorder_op = gen::ReorderOp {
             output: head_variable,
             input: variable,
@@ -82,6 +166,21 @@ pub(crate) fn encode(program: ast::Program) -> gen::Iteration {
 impl std::convert::From<Vec<ast::Arg>> for gen::DVars {
     fn from(args: Vec<ast::Arg>) -> Self {
         gen::DVars::new_tuple(args.into_iter().map(|arg| arg.to_ident()).collect())
+    }
+}
+
+impl std::convert::From<Vec<ast::Arg>> for gen::DVarTuple {
+    fn from(args: Vec<ast::Arg>) -> Self {
+        gen::DVarTuple::new(args.into_iter().map(|arg| arg.to_ident()).collect())
+    }
+}
+
+impl std::convert::From<(Vec<ast::Arg>, Vec<ast::Arg>)> for gen::DVars {
+    fn from((key, value): (Vec<ast::Arg>, Vec<ast::Arg>)) -> Self {
+        gen::DVars::new_key_val(
+            key.into_iter().map(|arg| arg.to_ident()).collect(),
+            value.into_iter().map(|arg| arg.to_ident()).collect(),
+        )
     }
 }
 
@@ -100,20 +199,24 @@ mod tests {
     use quote::ToTokens;
     use std::str::FromStr;
 
+    fn compare(datalog_source: &str, exptected_encoding: &str) {
+        let parsed_program = parse(datalog_source);
+        let typechecked_program = typecheck(parsed_program).unwrap();
+        let iteration = encode(typechecked_program);
+        let tokens = iteration.to_token_stream().to_string();
+        eprintln!("{}", tokens);
+        let expected_tokens = TokenStream::from_str(exptected_encoding).unwrap();
+        assert_eq!(tokens.to_string(), expected_tokens.to_string());
+    }
+
     #[test]
     fn encode_simple1() {
-        let program = parse(
+        compare(
             "
                 input inp(x: u32, y: u32)
                 output out(x: u32, y: u32)
                 out(x, y) :- inp(y, x).
             ",
-        );
-        let program = typecheck(program).unwrap();
-        let iteration = encode(program);
-        let tokens = iteration.to_token_stream().to_string();
-        eprintln!("{}", tokens);
-        let expected_tokens = TokenStream::from_str(
             r##"
                 {
                     let mut iteration = datafrog::Iteration::new();
@@ -127,8 +230,37 @@ mod tests {
                     out = var_out.complete();
                 }
             "##,
-        )
-        .unwrap();
-        assert_eq!(tokens.to_string(), expected_tokens.to_string());
+        );
+    }
+    #[test]
+    fn encode_transitive_closure() {
+        compare(
+            "
+                input inp(x: u32, y: u32)
+                output out(x: u32, y: u32)
+                out(x, y) :- inp(x, y).
+                out(x, y) :- out(x, z), out(z, y).
+            ",
+            r##"
+                {
+                    let mut iteration = datafrog::Iteration::new();
+                    let var_inp = datafrog::Relation::from_vec(inp);
+                    let var_out = iteration.variable:: <(u32, u32,)>("out");
+                    let var_inp1 = iteration.variable:: <(u32, u32,)>("inp1");
+                    let var_out2 = iteration.variable:: <((u32,), (u32,))>("out2");
+                    let var_out3 = iteration.variable:: <((u32,), (u32,))>("out3");
+                    let var_out4 = iteration.variable:: <(u32, u32, u32,)>("out4");
+                    var_inp1.insert(var_inp);
+                    while iteration.changed() {
+                        var_out.from_map(&var_inp1, | &(x, y,)| (x, y,));
+                        var_out2.from_map(&var_out, | &(x, z,)| ((z,), (x,)));
+                        var_out3.from_map(&var_out, | &(z, y,)| ((z,), (y,)));
+                        var_out4.from_join(&var_out2, &var_out3, | &(z,), &(x,), &(y,)| (z, x, y,));
+                        var_out.from_map(&var_out4, | &(z, x, y,)| (x, y,));
+                    }
+                    out = var_out.complete();
+                }
+            "##,
+        );
     }
 }

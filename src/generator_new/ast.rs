@@ -42,7 +42,7 @@ use crate::data_structures::OrderedMap;
 /// ```ignore
 /// r_1.from_map(&r, |(x, z)| {(z, x)});
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct DVar {
     pub name: syn::Ident,
 }
@@ -57,6 +57,14 @@ impl DVar {
 #[derive(Debug)]
 pub(crate) struct DVarTuple {
     pub vars: Vec<DVar>,
+}
+
+impl DVarTuple {
+    pub fn new(args: Vec<syn::Ident>) -> Self {
+        Self {
+            vars: args.into_iter().map(|ident| DVar::new(ident)).collect(),
+        }
+    }
 }
 
 /// A (key, value) representation of `DVar`s. It is used for joins.
@@ -75,8 +83,12 @@ pub(crate) enum DVars {
 
 impl DVars {
     pub fn new_tuple(args: Vec<syn::Ident>) -> Self {
-        DVars::Tuple(DVarTuple {
-            vars: args.into_iter().map(|ident| DVar::new(ident)).collect(),
+        DVars::Tuple(DVarTuple::new(args))
+    }
+    pub fn new_key_val(key: Vec<syn::Ident>, value: Vec<syn::Ident>) -> Self {
+        DVars::KeyVal(DVarKeyVal {
+            key: key.into_iter().map(|ident| DVar::new(ident)).collect(),
+            value: value.into_iter().map(|ident| DVar::new(ident)).collect(),
         })
     }
 }
@@ -125,14 +137,6 @@ pub(crate) struct Variable {
 }
 
 impl Variable {
-    pub fn with_suffix(&self, suffix: &str) -> Self {
-        Self {
-            name: syn::Ident::new(
-                &format!("{}{}", self.name, suffix),
-                proc_macro2::Span::call_site(),
-            ),
-        }
-    }
     pub fn with_counter(&self, counter: usize) -> Self {
         Self {
             name: syn::Ident::new(
@@ -160,40 +164,40 @@ pub(crate) struct ReorderOp {
 #[derive(Debug)]
 pub(crate) struct BindVarOp {
     /// A variable into which we write the result.
-    output: Variable,
+    pub output: Variable,
     /// A variable from which we read the input.
-    input: Variable,
+    pub input: Variable,
     /// Input variables that are copied to output and potentially used for evaluating `expr`.
-    vars: DVarTuple,
+    pub vars: DVarTuple,
     /// The expression whose result is bound to a new variable.
-    expr: syn::Expr,
+    pub expr: syn::Expr,
 }
 
 /// An operation that joins two variables.
 #[derive(Debug)]
 pub(crate) struct JoinOp {
     /// A variable into which we write the result.
-    output: Variable,
+    pub output: Variable,
     /// The first variable, which we use in join.
-    input_first: Variable,
+    pub input_first: Variable,
     /// The second variable, which we use in join.
-    input_second: Variable,
+    pub input_second: Variable,
     /// Datalog variables used for joining.
-    key: Vec<DVar>,
+    pub key: DVarTuple,
     /// Datalog value variables from the first variable.
-    value_first: Vec<DVar>,
+    pub value_first: DVarTuple,
     /// Datalog value variables from the second variable.
-    value_second: Vec<DVar>,
+    pub value_second: DVarTuple,
 }
 
 /// An operation that filters out facts.
 #[derive(Debug)]
 pub(crate) struct FilterOp {
     /// A variable which we want to filter.
-    variable: Variable,
-    vars: DVars,
+    pub variable: Variable,
+    pub vars: DVars,
     /// A boolean expression used for filtering.
-    expr: syn::Expr,
+    pub expr: syn::Expr,
 }
 
 /// An operation that inserts the relation into a variable.
@@ -260,6 +264,16 @@ impl Iteration {
         }));
         new_variable
     }
+    /// Get Datafrog variable that corresponds to the given predicate name. If
+    /// we have only a relation, then convert it into a variable.
+    pub fn get_or_convert_variable(&mut self, predicate: &syn::Ident) -> Variable {
+        if let Some(variable) = self.get_relation_var(predicate) {
+            // TODO: Avoid converting the same relation multiple times.
+            self.convert_relation_to_variable(&variable)
+        } else {
+            self.get_variable(predicate)
+        }
+    }
     pub fn get_relation_var(&self, variable_name: &syn::Ident) -> Option<Variable> {
         self.relations
             .get(variable_name)
@@ -270,5 +284,38 @@ impl Iteration {
     }
     pub fn add_operation(&mut self, operation: Operation) {
         self.body_operations.push(operation);
+    }
+    pub fn get_variable_tuple_types(&self, variable: &Variable) -> Vec<syn::Type> {
+        let decl = &self.variables[&variable.name];
+        match &decl.typ {
+            DVarTypes::Tuple(types) => types.clone(),
+            DVarTypes::KeyVal { .. } => unreachable!(),
+        }
+    }
+    pub fn create_key_val_variable(
+        &mut self,
+        variable: &Variable,
+        key: Vec<syn::Type>,
+        value: Vec<syn::Type>,
+    ) -> Variable {
+        self.create_variable(variable, DVarTypes::KeyVal { key, value })
+    }
+    pub fn create_tuple_variable(
+        &mut self,
+        variable: &Variable,
+        types: Vec<syn::Type>,
+    ) -> Variable {
+        self.create_variable(variable, DVarTypes::Tuple(types))
+    }
+    pub fn create_variable(&mut self, variable: &Variable, typ: DVarTypes) -> Variable {
+        let variable_decl = VariableDecl {
+            var: variable.with_counter(self.variables.len()),
+            typ: typ,
+            is_output: false,
+        };
+        let new_variable = variable_decl.var.clone();
+        self.variables
+            .insert(new_variable.name.clone(), variable_decl);
+        new_variable
     }
 }

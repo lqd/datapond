@@ -28,16 +28,16 @@ impl ToTokens for DVar {
 
 impl ToTokens for DVarTuple {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let mut vars = var_vec_to_tokens(&self.vars);
+        let vars = var_vec_to_tokens(&self.vars);
         tokens.extend(quote! {(#vars)});
     }
 }
 
 impl ToTokens for DVarKeyVal {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let mut key = var_vec_to_tokens(&self.key);
-        let mut value = var_vec_to_tokens(&self.value);
-        tokens.extend(quote! {((#key), (value))});
+        let key = var_vec_to_tokens(&self.key);
+        let value = var_vec_to_tokens(&self.value);
+        tokens.extend(quote! {((#key), (#value))});
     }
 }
 
@@ -96,7 +96,30 @@ impl ToTokens for BindVarOp {
 
 impl ToTokens for JoinOp {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        unimplemented!();
+        let JoinOp {
+            output,
+            input_first,
+            input_second,
+            key,
+            value_first,
+            value_second,
+        } = self;
+        let flattened = DVarTuple {
+            vars: key
+                .vars
+                .iter()
+                .chain(&value_first.vars)
+                .chain(&value_second.vars)
+                .cloned()
+                .collect(),
+        };
+
+        tokens.extend(quote! {
+            #output.from_join(
+                &#input_first,
+                &#input_second,
+                |&#key, &#value_first, &#value_second| #flattened);
+        });
     }
 }
 
