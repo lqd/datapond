@@ -1,8 +1,8 @@
 //! This file contains the typed AST.
 
+use crate::data_structures::OrderedMap;
 use proc_macro2::Ident;
 use quote::ToTokens;
-use std::collections::HashMap;
 use std::fmt;
 
 /// The predicate kind regarding IO.
@@ -203,6 +203,6 @@ impl fmt::Display for Rule {
 /// A Datalog program.
 #[derive(Debug, Clone)]
 pub struct Program {
-    pub decls: HashMap<String, PredicateDecl>,
+    pub decls: OrderedMap<String, PredicateDecl>,
     pub rules: Vec<Rule>,
 }

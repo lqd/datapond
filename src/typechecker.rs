@@ -1,4 +1,5 @@
 use crate::ast;
+use crate::data_structures::OrderedMap;
 use crate::parser::ast as past;
 use proc_macro2::Span;
 use std::collections::{HashMap, HashSet};
@@ -46,7 +47,7 @@ impl fmt::Display for Error {
 
 fn check_head(
     head: &past::RuleHead,
-    decls: &HashMap<String, ast::PredicateDecl>,
+    decls: &OrderedMap<String, ast::PredicateDecl>,
 ) -> Result<(), Error> {
     let decl = decls.get(&head.predicate.to_string()).ok_or_else(|| {
         Error::new(
@@ -71,7 +72,7 @@ fn check_head(
 
 fn check_body(
     body: Vec<past::Literal>,
-    decls: &HashMap<String, ast::PredicateDecl>,
+    decls: &OrderedMap<String, ast::PredicateDecl>,
 ) -> Result<Vec<ast::Literal>, Error> {
     let mut new_body = Vec::new();
     for literal in body {
@@ -151,7 +152,7 @@ fn check_body(
 }
 
 pub(crate) fn typecheck(program: past::Program) -> Result<ast::Program, Error> {
-    let mut decls = HashMap::new();
+    let mut decls = OrderedMap::new();
     let mut rules = Vec::new();
 
     for item in program.items {

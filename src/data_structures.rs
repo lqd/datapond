@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 /// A map that tracks insertion order.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct OrderedMap<K, V>
 where
     K: Eq + std::hash::Hash,
@@ -11,6 +11,12 @@ where
 }
 
 impl<K: Eq + std::hash::Hash + Clone, V> OrderedMap<K, V> {
+    pub fn new() -> Self {
+        Self {
+            key_order: Vec::new(),
+            map: HashMap::new(),
+        }
+    }
     pub fn len(&self) -> usize {
         self.map.len()
     }

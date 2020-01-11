@@ -1,8 +1,10 @@
 use crate::{ast, parser, typechecker};
 use quote::ToTokens;
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::collections::HashMap;
+use crate::data_structures::OrderedMap;
 use std::fmt::{self, Write};
+
+type HashMap<K, V> = OrderedMap<K, V>;
 
 /// The representation of what a datalog rule does in datafrog terms
 enum Operation {
