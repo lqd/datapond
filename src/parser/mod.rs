@@ -136,24 +136,29 @@ impl Parse for ast::RuleHead {
 impl Parse for ast::Rule {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let head = input.parse()?;
-        input.step(|cursor| {
-            let rest = match cursor.token_tree() {
-                Some((proc_macro2::TokenTree::Punct(ref punct), next))
-                    if punct.as_char() == ':' && punct.spacing() == proc_macro2::Spacing::Joint =>
-                {
-                    next
-                }
-                _ => return Err(cursor.error(":- expected")),
-            };
-            match rest.token_tree() {
-                Some((proc_macro2::TokenTree::Punct(ref punct), next))
-                    if punct.as_char() == '-' =>
-                {
-                    Ok(((), next))
-                }
-                _ => Err(cursor.error(":- expected")),
-            }
-        })?;
+        // FIXME: For some reason, when getting input from a procedural macro,
+        // a space is always inserted between `:` and `-`. Therefore, the parser
+        // needs to accept the variant with a space.
+        input.parse::<Token![:]>()?;
+        input.parse::<Token![-]>()?;
+        // input.step(|cursor| {
+        //     let rest = match cursor.token_tree() {
+        //         Some((proc_macro2::TokenTree::Punct(ref punct), next))
+        //             if punct.as_char() == ':' && punct.spacing() == proc_macro2::Spacing::Joint =>
+        //         {
+        //             next
+        //         }
+        //         _ => return Err(cursor.error(":- expected")),
+        //     };
+        //     match rest.token_tree() {
+        //         Some((proc_macro2::TokenTree::Punct(ref punct), next))
+        //             if punct.as_char() == '-' =>
+        //         {
+        //             Ok(((), next))
+        //         }
+        //         _ => Err(cursor.error(":- expected")),
+        //     }
+        // })?;
         let body: Punctuated<ast::Literal, Token![,]> =
             Punctuated::parse_separated_nonempty(input)?;
         // Allow trailing punctuation.

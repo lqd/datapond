@@ -34,7 +34,7 @@
 //! let r = in.iter().map(|(y, x)| {(x, y)});
 //! ```
 
-use std::collections::HashMap;
+use crate::data_structures::OrderedMap;
 
 /// A Datalog variable.
 ///
@@ -91,6 +91,12 @@ pub(crate) enum DVarTypes {
     },
 }
 
+impl std::convert::From<Vec<syn::Type>> for DVarTypes {
+    fn from(types: Vec<syn::Type>) -> Self {
+        DVarTypes::Tuple(types)
+    }
+}
+
 /// A Datafrog relation.
 #[derive(Debug)]
 pub(crate) struct RelationDecl {
@@ -116,6 +122,25 @@ pub(crate) struct VariableDecl {
 #[derive(Debug, Clone)]
 pub(crate) struct Variable {
     pub name: syn::Ident,
+}
+
+impl Variable {
+    pub fn with_suffix(&self, suffix: &str) -> Self {
+        Self {
+            name: syn::Ident::new(
+                &format!("{}{}", self.name, suffix),
+                proc_macro2::Span::call_site(),
+            ),
+        }
+    }
+    pub fn with_counter(&self, counter: usize) -> Self {
+        Self {
+            name: syn::Ident::new(
+                &format!("{}{}", self.name, counter),
+                proc_macro2::Span::call_site(),
+            ),
+        }
+    }
 }
 
 /// An operation that reorders and potentially drops Datalog variables.
@@ -171,20 +196,35 @@ pub(crate) struct FilterOp {
     expr: syn::Expr,
 }
 
+/// An operation that inserts the relation into a variable.
+#[derive(Debug)]
+pub(crate) struct InsertOp {
+    /// The variable into which we want to insert the relation.
+    pub variable: Variable,
+    /// The relation to be inserted.
+    pub relation: Variable,
+}
+
 #[derive(Debug)]
 pub(crate) enum Operation {
     Reorder(ReorderOp),
     BindVar(BindVarOp),
     Join(JoinOp),
     Filter(FilterOp),
+    Insert(InsertOp),
 }
 
 /// A Datafrog iteration.
 #[derive(Debug)]
 pub(crate) struct Iteration {
-    pub relations: HashMap<syn::Ident, RelationDecl>,
-    pub variables: HashMap<syn::Ident, VariableDecl>,
-    pub operations: Vec<Operation>,
+    pub relations: OrderedMap<syn::Ident, RelationDecl>,
+    pub variables: OrderedMap<syn::Ident, VariableDecl>,
+    /// Operations performed before entering the iteration.
+    pub pre_operations: Vec<Operation>,
+    /// Operations performed in the body of the iteration.
+    pub body_operations: Vec<Operation>,
+    /// Operations performed after exiting the iteration.
+    pub post_operations: Vec<Operation>,
 }
 
 impl Iteration {
@@ -198,17 +238,37 @@ impl Iteration {
                 .into_iter()
                 .map(|decl| (decl.var.name.clone(), decl))
                 .collect(),
-            operations: Vec::new(),
+            pre_operations: Vec::new(),
+            body_operations: Vec::new(),
+            post_operations: Vec::new(),
         }
+    }
+    /// Convert a Datafrog relation to a Datafrog variable and return its identifier.
+    pub fn convert_relation_to_variable(&mut self, variable: &Variable) -> Variable {
+        let decl = &self.relations[&variable.name];
+        let variable_decl = VariableDecl {
+            var: decl.var.with_counter(self.variables.len()),
+            typ: decl.typ.clone().into(),
+            is_output: false,
+        };
+        let new_variable = variable_decl.var.clone();
+        self.variables
+            .insert(new_variable.name.clone(), variable_decl);
+        self.pre_operations.push(Operation::Insert(InsertOp {
+            variable: new_variable.clone(),
+            relation: decl.var.clone(),
+        }));
+        new_variable
+    }
+    pub fn get_relation_var(&self, variable_name: &syn::Ident) -> Option<Variable> {
+        self.relations
+            .get(variable_name)
+            .map(|decl| decl.var.clone())
     }
     pub fn get_variable(&self, variable_name: &syn::Ident) -> Variable {
-        if let Some(decl) = self.variables.get(variable_name) {
-            decl.var.clone()
-        } else {
-            self.relations[variable_name].var.clone()
-        }
+        self.variables[variable_name].var.clone()
     }
     pub fn add_operation(&mut self, operation: Operation) {
-        self.operations.push(operation);
+        self.body_operations.push(operation);
     }
 }

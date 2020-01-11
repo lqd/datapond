@@ -1,5 +1,5 @@
 use crate::generator_new::ast::*;
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use quote::ToTokens;
 
@@ -68,8 +68,9 @@ impl ToTokens for DVarTypes {
 
 impl ToTokens for Variable {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let name = &self.name;
-        tokens.extend(quote! {#name});
+        let var_name = format!("var_{}", self.name);
+        let ident = syn::Ident::new(&var_name, Span::call_site());
+        tokens.extend(quote! {#ident});
     }
 }
 
@@ -105,6 +106,15 @@ impl ToTokens for FilterOp {
     }
 }
 
+impl ToTokens for InsertOp {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let InsertOp { variable, relation } = self;
+        tokens.extend(quote! {
+            #variable.insert(#relation);
+        });
+    }
+}
+
 impl ToTokens for Operation {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
@@ -112,8 +122,17 @@ impl ToTokens for Operation {
             Operation::BindVar(op) => op.to_tokens(tokens),
             Operation::Join(op) => op.to_tokens(tokens),
             Operation::Filter(op) => op.to_tokens(tokens),
+            Operation::Insert(op) => op.to_tokens(tokens),
         }
     }
+}
+
+fn operation_vec_to_tokens(operations: &Vec<Operation>) -> TokenStream {
+    let mut tokens = TokenStream::new();
+    for operation in operations {
+        operation.to_tokens(&mut tokens);
+    }
+    tokens
 }
 
 impl ToTokens for Iteration {
@@ -122,41 +141,41 @@ impl ToTokens for Iteration {
         for relation in self.relations.values() {
             let vec_name = &relation.var.name;
             let var = relation.var.to_token_stream();
-            let mut typ = TokenStream::new();
-            for var_typ in &relation.typ {
-                typ.extend(quote! {#var_typ,});
-            }
             declare_relations.extend(quote! {
-                let #var = datafrog::Relation::from_vec::<(#typ)>(#vec_name);
+                let #var = datafrog::Relation::from_vec(#vec_name);
             });
         }
         let mut declare_variables = TokenStream::new();
         let mut output_results = TokenStream::new();
         for variable in self.variables.values() {
             let var = variable.var.to_token_stream();
-            let var_name = var.to_string();
+            let var_name = variable.var.name.to_string();
             let typ = variable.typ.to_token_stream();
             declare_variables.extend(quote! {
                 let #var = iteration.variable::<#typ>(#var_name);
             });
             if variable.is_output {
+                let new_var = &variable.var.name;
                 output_results.extend(quote! {
-                    let #var = #var.complete();
+                    #new_var = #var.complete();
                 });
             }
         }
-        let mut operations = TokenStream::new();
-        for operation in &self.operations {
-            operation.to_tokens(&mut operations);
-        }
+        let pre_operations = operation_vec_to_tokens(&self.pre_operations);
+        let body_operations = operation_vec_to_tokens(&self.body_operations);
+        let post_operations = operation_vec_to_tokens(&self.post_operations);
         tokens.extend(quote! {
-            let mut iteration = datafrog::Iteration::new();
-            #declare_relations
-            #declare_variables
-            while iteration.changed() {
-                #operations
+            {
+                let mut iteration = datafrog::Iteration::new();
+                #declare_relations
+                #declare_variables
+                #pre_operations
+                while iteration.changed() {
+                    #body_operations
+                }
+                #post_operations
+                #output_results
             }
-            #output_results
         });
     }
 }

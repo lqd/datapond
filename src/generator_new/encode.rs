@@ -1,7 +1,7 @@
 use crate::ast;
 use crate::generator_new::ast as gen;
 
-fn encode(program: ast::Program) -> gen::Iteration {
+pub(crate) fn encode(program: ast::Program) -> gen::Iteration {
     let mut relations = Vec::new();
     let mut variables = Vec::new();
     for decl in program.decls.values() {
@@ -40,7 +40,11 @@ fn encode(program: ast::Program) -> gen::Iteration {
         if literal1.is_negated {
             unimplemented!();
         }
-        let variable = iteration.get_variable(&literal1.predicate);
+        let variable = if let Some(variable) = iteration.get_relation_var(&literal1.predicate) {
+            iteration.convert_relation_to_variable(&variable)
+        } else {
+            iteration.get_variable(&literal1.predicate)
+        };
         let args = literal1.args.clone();
 
         // Retrieve the main variable for the head.
@@ -111,13 +115,17 @@ mod tests {
         eprintln!("{}", tokens);
         let expected_tokens = TokenStream::from_str(
             r##"
-                let mut iteration = datafrog::Iteration::new();
-                let inp = datafrog::Relation::from_vec:: <(u32, u32,)>(inp);
-                let out = iteration.variable:: <(u32, u32,)>("out");
-                while iteration.changed() {
-                    out.from_map(&inp, | &(y, x,)| (x, y,));
+                {
+                    let mut iteration = datafrog::Iteration::new();
+                    let var_inp = datafrog::Relation::from_vec(inp);
+                    let var_out = iteration.variable:: <(u32, u32,)>("out");
+                    let var_inp1 = iteration.variable:: <(u32, u32,)>("inp1");
+                    var_inp1.insert(var_inp);
+                    while iteration.changed() {
+                        var_out.from_map(&var_inp1, | &(y, x,)| (x, y,));
+                    }
+                    out = var_out.complete();
                 }
-                let out = out.complete();
             "##,
         )
         .unwrap();
