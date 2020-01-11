@@ -191,6 +191,21 @@ pub(crate) struct JoinOp {
     pub value_second: DVarTuple,
 }
 
+/// An operation that removes facts from the variable that belong to the relation.
+#[derive(Debug)]
+pub(crate) struct AntiJoinOp {
+    /// The variable into which we write the result.
+    pub output: Variable,
+    /// The variable from which we take facts.
+    pub input_variable: Variable,
+    /// The relation in which we check facts.
+    pub input_relation: Variable,
+    /// Datalog variables used for joining.
+    pub key: DVarTuple,
+    /// Datalog value variables from the variable.
+    pub value: DVarTuple,
+}
+
 /// An operation that filters out facts.
 #[derive(Debug)]
 pub(crate) struct FilterOp {
@@ -215,6 +230,7 @@ pub(crate) enum Operation {
     Reorder(ReorderOp),
     // BindVar(BindVarOp),
     Join(JoinOp),
+    AntiJoin(AntiJoinOp),
     // Filter(FilterOp),
     Insert(InsertOp),
 }

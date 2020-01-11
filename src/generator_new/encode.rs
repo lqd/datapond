@@ -98,65 +98,20 @@ pub(crate) fn encode(program: ast::Program) -> gen::Iteration {
         let head_variable = iteration.get_variable(&rule.head.predicate);
         let mut iter = rule.body.iter();
         let literal1 = iter.next().unwrap();
-        if literal1.is_negated {
-            unimplemented!();
-        }
+        assert!(!literal1.is_negated);
         let mut variable = iteration.get_or_convert_variable(&literal1.predicate);
         let mut args = literal1.args.clone();
 
         while let Some(literal) = iter.next() {
-            let joined_variable = iteration.get_or_convert_variable(&literal.predicate);
             // TODO: Check during the typechecking phase that no literal has two
             // arguments with the same name.
-            let arg_types = iteration.get_variable_tuple_types(&variable);
-            let literal_arg_types = iteration.get_variable_tuple_types(&joined_variable);
-            let ((key, key_types), (remainder1, remainder1_types), (remainder2, remainder2_types)) =
-                common_args(&args, &arg_types, &literal.args, &literal_arg_types);
-            let first_variable = iteration.create_key_val_variable(
-                &variable,
-                key_types.clone(),
-                remainder1_types.clone(),
-            );
-            let reorder_first_op = gen::ReorderOp {
-                output: first_variable.clone(),
-                input: variable,
-                input_vars: args.into(),
-                output_vars: (key.clone(), remainder1.clone()).into(),
+            let (new_variable, new_args) = if literal.is_negated {
+                encode_antijoin(&mut iteration, &head_variable, variable, args, literal)
+            } else {
+                encode_join(&mut iteration, &head_variable, variable, args, literal)
             };
-            iteration.add_operation(gen::Operation::Reorder(reorder_first_op));
-            let second_variable = iteration.create_key_val_variable(
-                &joined_variable,
-                key_types.clone(),
-                remainder2_types.clone(),
-            );
-            let reorder_second_op = gen::ReorderOp {
-                output: second_variable.clone(),
-                input: joined_variable,
-                input_vars: literal.args.clone().into(),
-                output_vars: (key.clone(), remainder2.clone()).into(),
-            };
-            iteration.add_operation(gen::Operation::Reorder(reorder_second_op));
-            let result_types = key_types
-                .into_iter()
-                .chain(remainder1_types)
-                .chain(remainder2_types)
-                .collect();
-            args = key
-                .clone()
-                .into_iter()
-                .chain(remainder1.clone())
-                .chain(remainder2.clone())
-                .collect();
-            variable = iteration.create_tuple_variable(&head_variable, result_types);
-            let join_op = gen::JoinOp {
-                output: variable.clone(),
-                input_first: first_variable,
-                input_second: second_variable,
-                key: key.into(),
-                value_first: remainder1.into(),
-                value_second: remainder2.into(),
-            };
-            iteration.add_operation(gen::Operation::Join(join_op));
+            variable = new_variable;
+            args = new_args;
         }
         let reorder_op = gen::ReorderOp {
             output: head_variable,
@@ -167,6 +122,126 @@ pub(crate) fn encode(program: ast::Program) -> gen::Iteration {
         iteration.add_operation(gen::Operation::Reorder(reorder_op));
     }
     iteration
+}
+
+fn encode_antijoin(
+    iteration: &mut gen::Iteration,
+    head_variable: &gen::Variable,
+    variable: gen::Variable,
+    args: Vec<ast::Arg>,
+    literal: &ast::Literal,
+) -> (gen::Variable, Vec<ast::Arg>) {
+    let relation_variable = iteration
+        .get_relation_var(&literal.predicate)
+        .expect("Negations are currently supported only on relations.");
+    let arg_types = iteration.get_variable_tuple_types(&variable);
+    let literal_arg_types = iteration.relations[&relation_variable.name].typ.clone();
+
+    // TODO: Lift this limitation.
+    for arg in &literal.args {
+        if !args.contains(arg) {
+            unimplemented!("Currently all variables from the negated relation must be used.");
+        }
+    }
+    let mut remainder = Vec::new();
+    let mut remainder_types = Vec::new();
+    for (arg, arg_type) in args.iter().zip(&arg_types) {
+        if !literal.args.contains(arg) {
+            remainder.push(arg.clone());
+            remainder_types.push(arg_type.clone());
+        }
+    }
+
+    let first_variable = iteration.create_key_val_variable(
+        &variable,
+        literal_arg_types.clone(),
+        remainder_types.clone(),
+    );
+    let reorder_first_op = gen::ReorderOp {
+        output: first_variable.clone(),
+        input: variable,
+        input_vars: args.into(),
+        output_vars: (literal.args.clone(), remainder.clone()).into(),
+    };
+    iteration.add_operation(gen::Operation::Reorder(reorder_first_op));
+
+    let result_types = literal_arg_types
+        .into_iter()
+        .chain(remainder_types)
+        .collect();
+    let args = literal
+        .args
+        .clone()
+        .into_iter()
+        .chain(remainder.clone())
+        .collect();
+    let variable = iteration.create_tuple_variable(&head_variable, result_types);
+    let join_op = gen::AntiJoinOp {
+        output: variable.clone(),
+        input_variable: first_variable,
+        input_relation: relation_variable,
+        key: literal.args.clone().into(),
+        value: remainder.into(),
+    };
+    iteration.add_operation(gen::Operation::AntiJoin(join_op));
+    (variable, args)
+}
+
+fn encode_join(
+    iteration: &mut gen::Iteration,
+    head_variable: &gen::Variable,
+    variable: gen::Variable,
+    args: Vec<ast::Arg>,
+    literal: &ast::Literal,
+) -> (gen::Variable, Vec<ast::Arg>) {
+    let joined_variable = iteration.get_or_convert_variable(&literal.predicate);
+    let arg_types = iteration.get_variable_tuple_types(&variable);
+    let literal_arg_types = iteration.get_variable_tuple_types(&joined_variable);
+    let ((key, key_types), (remainder1, remainder1_types), (remainder2, remainder2_types)) =
+        common_args(&args, &arg_types, &literal.args, &literal_arg_types);
+    let first_variable =
+        iteration.create_key_val_variable(&variable, key_types.clone(), remainder1_types.clone());
+    let reorder_first_op = gen::ReorderOp {
+        output: first_variable.clone(),
+        input: variable,
+        input_vars: args.into(),
+        output_vars: (key.clone(), remainder1.clone()).into(),
+    };
+    iteration.add_operation(gen::Operation::Reorder(reorder_first_op));
+    let second_variable = iteration.create_key_val_variable(
+        &joined_variable,
+        key_types.clone(),
+        remainder2_types.clone(),
+    );
+    let reorder_second_op = gen::ReorderOp {
+        output: second_variable.clone(),
+        input: joined_variable,
+        input_vars: literal.args.clone().into(),
+        output_vars: (key.clone(), remainder2.clone()).into(),
+    };
+    iteration.add_operation(gen::Operation::Reorder(reorder_second_op));
+    let result_types = key_types
+        .into_iter()
+        .chain(remainder1_types)
+        .chain(remainder2_types)
+        .collect();
+    let args = key
+        .clone()
+        .into_iter()
+        .chain(remainder1.clone())
+        .chain(remainder2.clone())
+        .collect();
+    let variable = iteration.create_tuple_variable(&head_variable, result_types);
+    let join_op = gen::JoinOp {
+        output: variable.clone(),
+        input_first: first_variable,
+        input_second: second_variable,
+        key: key.into(),
+        value_first: remainder1.into(),
+        value_second: remainder2.into(),
+    };
+    iteration.add_operation(gen::Operation::Join(join_op));
+    (variable, args)
 }
 
 impl std::convert::From<Vec<ast::Arg>> for gen::DVars {
@@ -292,6 +367,35 @@ mod tests {
                         var_inp_1_3.from_map(&var_inp_1, | &(_, x,)| ((x,), ()));
                         var_out_4.from_join(&var_inp_1_2, &var_inp_1_3, | &(x,), &(), &()| (x,));
                         var_out.from_map(&var_out_4, | &(x,)| (x,));
+                    }
+                    out = var_out.complete();
+                }
+            "##,
+        );
+    }
+    #[test]
+    fn encode_kill() {
+        compare(
+            "
+                input inp(x: u32, y: u32)
+                input kill(y: u32)
+                output out(x: u32, y: u32)
+                out(x, y) :- inp(x, y), !kill(y).
+            ",
+            r##"
+                {
+                    let mut iteration = datafrog::Iteration::new();
+                    let var_inp = datafrog::Relation:: <(u32, u32,)> ::from_vec(inp);
+                    let var_kill = datafrog::Relation:: <(u32,)> ::from_vec(kill);
+                    let var_out = iteration.variable:: <(u32, u32,)>("out");
+                    let var_inp_1 = iteration.variable:: <(u32, u32,)>("inp_1");
+                    let var_inp_1_2 = iteration.variable:: <((u32,), (u32,))>("inp_1_2");
+                    let var_out_3 = iteration.variable:: <(u32, u32,)>("out_3");
+                    var_inp_1.insert(var_inp);
+                    while iteration.changed() {
+                        var_inp_1_2.from_map(&var_inp_1, | &(x, y,)| ((y,), (x,)));
+                        var_out_3.from_antijoin(&var_inp_1_2, &var_kill, | &(y,), &(x,)| (y, x,));
+                        var_out.from_map(&var_out_3, | &(y, x,)| (x, y,));
                     }
                     out = var_out.complete();
                 }

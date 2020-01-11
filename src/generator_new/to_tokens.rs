@@ -123,6 +123,28 @@ impl ToTokens for JoinOp {
     }
 }
 
+impl ToTokens for AntiJoinOp {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let AntiJoinOp {
+            output,
+            input_variable,
+            input_relation,
+            key,
+            value,
+        } = self;
+        let flattened = DVarTuple {
+            vars: key.vars.iter().chain(&value.vars).cloned().collect(),
+        };
+
+        tokens.extend(quote! {
+            #output.from_antijoin(
+                &#input_variable,
+                &#input_relation,
+                |&#key, &#value| #flattened);
+        });
+    }
+}
+
 impl ToTokens for FilterOp {
     fn to_tokens(&self, _tokens: &mut TokenStream) {
         unimplemented!();
@@ -144,6 +166,7 @@ impl ToTokens for Operation {
             Operation::Reorder(op) => op.to_tokens(tokens),
             // Operation::BindVar(op) => op.to_tokens(tokens),
             Operation::Join(op) => op.to_tokens(tokens),
+            Operation::AntiJoin(op) => op.to_tokens(tokens),
             // Operation::Filter(op) => op.to_tokens(tokens),
             Operation::Insert(op) => op.to_tokens(tokens),
         }
