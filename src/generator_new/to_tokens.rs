@@ -89,7 +89,7 @@ impl ToTokens for ReorderOp {
 }
 
 impl ToTokens for BindVarOp {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
+    fn to_tokens(&self, _tokens: &mut TokenStream) {
         unimplemented!();
     }
 }
@@ -124,7 +124,7 @@ impl ToTokens for JoinOp {
 }
 
 impl ToTokens for FilterOp {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
+    fn to_tokens(&self, _tokens: &mut TokenStream) {
         unimplemented!();
     }
 }
@@ -142,9 +142,9 @@ impl ToTokens for Operation {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
             Operation::Reorder(op) => op.to_tokens(tokens),
-            Operation::BindVar(op) => op.to_tokens(tokens),
+            // Operation::BindVar(op) => op.to_tokens(tokens),
             Operation::Join(op) => op.to_tokens(tokens),
-            Operation::Filter(op) => op.to_tokens(tokens),
+            // Operation::Filter(op) => op.to_tokens(tokens),
             Operation::Insert(op) => op.to_tokens(tokens),
         }
     }

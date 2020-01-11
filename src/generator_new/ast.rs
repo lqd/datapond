@@ -213,9 +213,9 @@ pub(crate) struct InsertOp {
 #[derive(Debug)]
 pub(crate) enum Operation {
     Reorder(ReorderOp),
-    BindVar(BindVarOp),
+    // BindVar(BindVarOp),
     Join(JoinOp),
-    Filter(FilterOp),
+    // Filter(FilterOp),
     Insert(InsertOp),
 }
 
