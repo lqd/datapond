@@ -226,7 +226,7 @@ mod tests {
             r##"
                 {
                     let mut iteration = datafrog::Iteration::new();
-                    let var_inp = datafrog::Relation::from_vec(inp);
+                    let var_inp = datafrog::Relation:: <(u32, u32,)> ::from_vec(inp);
                     let var_out = iteration.variable:: <(u32, u32,)>("out");
                     let var_inp_1 = iteration.variable:: <(u32, u32,)>("inp_1");
                     var_inp_1.insert(var_inp);
@@ -250,7 +250,7 @@ mod tests {
             r##"
                 {
                     let mut iteration = datafrog::Iteration::new();
-                    let var_inp = datafrog::Relation::from_vec(inp);
+                    let var_inp = datafrog::Relation:: <(u32, u32,)> ::from_vec(inp);
                     let var_out = iteration.variable:: <(u32, u32,)>("out");
                     let var_inp_1 = iteration.variable:: <(u32, u32,)>("inp_1");
                     let var_out_2 = iteration.variable:: <((u32,), (u32,))>("out_2");
@@ -280,7 +280,7 @@ mod tests {
             r##"
                 {
                     let mut iteration = datafrog::Iteration::new();
-                    let var_inp = datafrog::Relation::from_vec(inp);
+                    let var_inp = datafrog::Relation:: <(u32, u32,)> ::from_vec(inp);
                     let var_out = iteration.variable:: <(u32,)>("out");
                     let var_inp_1 = iteration.variable:: <(u32, u32,)>("inp_1");
                     let var_inp_1_2 = iteration.variable:: <((u32,), ())>("inp_1_2");

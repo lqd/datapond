@@ -164,8 +164,9 @@ impl ToTokens for Iteration {
         for relation in self.relations.values() {
             let vec_name = &relation.var.name;
             let var = relation.var.to_token_stream();
+            let typ = type_vec_to_tokens(&relation.typ);
             declare_relations.extend(quote! {
-                let #var = datafrog::Relation::from_vec(#vec_name);
+                let #var = datafrog::Relation::<(#typ)>::from_vec(#vec_name);
             });
         }
         let mut declare_variables = TokenStream::new();
