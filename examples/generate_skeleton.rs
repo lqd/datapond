@@ -1,5 +1,5 @@
-use std::env;
 use datapond;
+use std::env;
 
 fn main() {
     if env::var("RUST_LOG").is_ok() {
