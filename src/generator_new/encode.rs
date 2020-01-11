@@ -25,6 +25,9 @@ fn common_args(
     let mut first_remainder_types = Vec::new();
 
     for (arg1, arg1_type) in first.iter().zip(first_types) {
+        if arg1.is_wildcard() {
+            continue;
+        }
         let mut found = false;
         for arg2 in second {
             if arg1 == arg2 {
@@ -42,6 +45,9 @@ fn common_args(
     let mut second_remainder = Vec::new();
     let mut second_remainder_types = Vec::new();
     for (arg2, arg2_type) in second.iter().zip(second_types) {
+        if arg2.is_wildcard() {
+            continue;
+        }
         if !key.contains(arg2) {
             second_remainder.push(arg2.clone());
             second_remainder_types.push(arg2_type.clone());
@@ -222,10 +228,10 @@ mod tests {
                     let mut iteration = datafrog::Iteration::new();
                     let var_inp = datafrog::Relation::from_vec(inp);
                     let var_out = iteration.variable:: <(u32, u32,)>("out");
-                    let var_inp1 = iteration.variable:: <(u32, u32,)>("inp1");
-                    var_inp1.insert(var_inp);
+                    let var_inp_1 = iteration.variable:: <(u32, u32,)>("inp_1");
+                    var_inp_1.insert(var_inp);
                     while iteration.changed() {
-                        var_out.from_map(&var_inp1, | &(y, x,)| (x, y,));
+                        var_out.from_map(&var_inp_1, | &(y, x,)| (x, y,));
                     }
                     out = var_out.complete();
                 }
@@ -246,17 +252,46 @@ mod tests {
                     let mut iteration = datafrog::Iteration::new();
                     let var_inp = datafrog::Relation::from_vec(inp);
                     let var_out = iteration.variable:: <(u32, u32,)>("out");
-                    let var_inp1 = iteration.variable:: <(u32, u32,)>("inp1");
-                    let var_out2 = iteration.variable:: <((u32,), (u32,))>("out2");
-                    let var_out3 = iteration.variable:: <((u32,), (u32,))>("out3");
-                    let var_out4 = iteration.variable:: <(u32, u32, u32,)>("out4");
-                    var_inp1.insert(var_inp);
+                    let var_inp_1 = iteration.variable:: <(u32, u32,)>("inp_1");
+                    let var_out_2 = iteration.variable:: <((u32,), (u32,))>("out_2");
+                    let var_out_3 = iteration.variable:: <((u32,), (u32,))>("out_3");
+                    let var_out_4 = iteration.variable:: <(u32, u32, u32,)>("out_4");
+                    var_inp_1.insert(var_inp);
                     while iteration.changed() {
-                        var_out.from_map(&var_inp1, | &(x, y,)| (x, y,));
-                        var_out2.from_map(&var_out, | &(x, z,)| ((z,), (x,)));
-                        var_out3.from_map(&var_out, | &(z, y,)| ((z,), (y,)));
-                        var_out4.from_join(&var_out2, &var_out3, | &(z,), &(x,), &(y,)| (z, x, y,));
-                        var_out.from_map(&var_out4, | &(z, x, y,)| (x, y,));
+                        var_out.from_map(&var_inp_1, | &(x, y,)| (x, y,));
+                        var_out_2.from_map(&var_out, | &(x, z,)| ((z,), (x,)));
+                        var_out_3.from_map(&var_out, | &(z, y,)| ((z,), (y,)));
+                        var_out_4.from_join(&var_out_2, &var_out_3, | &(z,), &(x,), &(y,)| (z, x, y,));
+                        var_out.from_map(&var_out_4, | &(z, x, y,)| (x, y,));
+                    }
+                    out = var_out.complete();
+                }
+            "##,
+        );
+    }
+    #[test]
+    fn encode_rule_with_wildcards() {
+        compare(
+            "
+                input inp(x: u32, y: u32)
+                output out(x: u32)
+                out(x) :- inp(x, _), inp(_, x).
+            ",
+            r##"
+                {
+                    let mut iteration = datafrog::Iteration::new();
+                    let var_inp = datafrog::Relation::from_vec(inp);
+                    let var_out = iteration.variable:: <(u32,)>("out");
+                    let var_inp_1 = iteration.variable:: <(u32, u32,)>("inp_1");
+                    let var_inp_1_2 = iteration.variable:: <((u32,), ())>("inp_1_2");
+                    let var_inp_1_3 = iteration.variable:: <((u32,), ())>("inp_1_3");
+                    let var_out_4 = iteration.variable:: <(u32,)>("out_4");
+                    var_inp_1.insert(var_inp);
+                    while iteration.changed() {
+                        var_inp_1_2.from_map(&var_inp_1, | &(x, _,)| ((x,), ()));
+                        var_inp_1_3.from_map(&var_inp_1, | &(_, x,)| ((x,), ()));
+                        var_out_4.from_join(&var_inp_1_2, &var_inp_1_3, | &(x,), &(), &()| (x,));
+                        var_out.from_map(&var_out_4, | &(x,)| (x,));
                     }
                     out = var_out.complete();
                 }

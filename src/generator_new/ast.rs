@@ -35,6 +35,7 @@
 //! ```
 
 use crate::data_structures::OrderedMap;
+use std::collections::HashMap;
 
 /// A Datalog variable.
 ///
@@ -140,7 +141,7 @@ impl Variable {
     pub fn with_counter(&self, counter: usize) -> Self {
         Self {
             name: syn::Ident::new(
-                &format!("{}{}", self.name, counter),
+                &format!("{}_{}", self.name, counter),
                 proc_macro2::Span::call_site(),
             ),
         }
@@ -221,6 +222,8 @@ pub(crate) enum Operation {
 /// A Datafrog iteration.
 #[derive(Debug)]
 pub(crate) struct Iteration {
+    /// Variables that are converted relations.
+    relation_variables: HashMap<syn::Ident, syn::Ident>,
     pub relations: OrderedMap<syn::Ident, RelationDecl>,
     pub variables: OrderedMap<syn::Ident, VariableDecl>,
     /// Operations performed before entering the iteration.
@@ -234,6 +237,7 @@ pub(crate) struct Iteration {
 impl Iteration {
     pub fn new(relations: Vec<RelationDecl>, variables: Vec<VariableDecl>) -> Self {
         Self {
+            relation_variables: HashMap::new(),
             relations: relations
                 .into_iter()
                 .map(|decl| (decl.var.name.clone(), decl))
@@ -249,6 +253,9 @@ impl Iteration {
     }
     /// Convert a Datafrog relation to a Datafrog variable and return its identifier.
     pub fn convert_relation_to_variable(&mut self, variable: &Variable) -> Variable {
+        if let Some(name) = self.relation_variables.get(&variable.name) {
+            return self.variables[name].var.clone();
+        }
         let decl = &self.relations[&variable.name];
         let variable_decl = VariableDecl {
             var: decl.var.with_counter(self.variables.len()),
@@ -256,6 +263,8 @@ impl Iteration {
             is_output: false,
         };
         let new_variable = variable_decl.var.clone();
+        self.relation_variables
+            .insert(variable.name.clone(), new_variable.name.clone());
         self.variables
             .insert(new_variable.name.clone(), variable_decl);
         self.pre_operations.push(Operation::Insert(InsertOp {

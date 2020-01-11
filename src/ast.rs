@@ -105,6 +105,12 @@ impl Arg {
             Arg::Wildcard => syn::Ident::new("_", proc_macro2::Span::call_site()),
         }
     }
+    pub fn is_wildcard(&self) -> bool {
+        match self {
+            Arg::Ident(_) => false,
+            Arg::Wildcard => true,
+        }
+    }
 }
 
 impl fmt::Display for Arg {
