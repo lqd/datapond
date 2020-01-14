@@ -117,42 +117,46 @@ fn check_body(
                     .collect()
             }
             past::ArgList::Named(named_args) => {
-                let kwargs: HashMap<_, _> = named_args
-                    .into_iter()
-                    .map(|named_arg| (named_arg.param.to_string(), named_arg.arg))
-                    .collect();
-                let mut args = Vec::new();
+                let mut kwargs = HashMap::new();
                 let mut used_parameters = HashSet::new();
+                for named_arg in named_args {
+                    let param_name = named_arg.param.to_string();
+                    if used_parameters.contains(&param_name) {
+                        return Err(Error::new(
+                            format!("Parameter already bound: {}", param_name),
+                            named_arg.param.span(),
+                        ));
+                    }
+                    used_parameters.insert(param_name.clone());
+                    kwargs.insert(param_name, named_arg);
+                }
+                let mut args = Vec::new();
+                let mut available_parameters = HashSet::new();
                 for parameter in &decl.parameters {
                     let param_name = parameter.name.to_string();
                     let arg = match kwargs.get(&param_name) {
-                        Some(ident) => {
+                        Some(past::NamedArg { arg: ident, .. }) => {
                             let ident_str = ident.to_string();
-                            if used_parameters.contains(&ident_str) {
-                                return Err(Error::new(
-                                    format!("Parameter already bound: {}", ident_str),
-                                    ident.span(),
-                                ));
-                            }
                             used_parameters.insert(ident_str);
                             ast::Arg::Ident(ident.clone())
                         }
                         None => ast::Arg::Wildcard,
                     };
+                    available_parameters.insert(param_name);
                     args.push(arg);
                 }
                 for key in kwargs.keys() {
-                    if !used_parameters.contains(key) {
-                        let available_parameters: Vec<_> = used_parameters.iter().map(|parameter| parameter.to_string()).collect();
+                    if !available_parameters.contains(key) {
+                        let available_parameters: Vec<_> = available_parameters.into_iter().collect();
+                        let parameter_span = kwargs[key].param.span();
                         return Err(Error::new(
                             format!("Unknown parameter {} in predicate {}. Available parameters are: {}.",
                                 key, literal.predicate, available_parameters.join(","),
                             ),
-                            literal.predicate.span(),
+                            parameter_span,
                         ));
                     }
                 }
-                if kwargs.len() != used_parameters.len() {}
                 args
             }
         };
