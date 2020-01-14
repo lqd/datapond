@@ -9,7 +9,7 @@ use std::fmt;
 pub struct Error {
     pub msg: String,
     pub span: Span,
-    pub hint_span: Option<Span>,
+    pub hint: Option<(String, Span)>,
 }
 
 impl Error {
@@ -17,26 +17,34 @@ impl Error {
         Self {
             msg: msg,
             span: span,
-            hint_span: None,
+            hint: None,
         }
     }
-    fn with_hint_span(msg: String, span: Span, hint_span: Span) -> Self {
+    fn with_hint_span(msg: String, span: Span, hint_msg: String, hint_span: Span) -> Self {
         Self {
             msg: msg,
             span: span,
-            hint_span: Some(hint_span),
+            hint: Some((hint_msg, hint_span)),
         }
+    }
+    pub fn to_syn_error(&self) -> syn::Error {
+        let mut error = syn::Error::new(self.span, &self.msg);
+        if let Some((hint_msg, hint_span)) = &self.hint {
+            error.combine(syn::Error::new(hint_span.clone(), hint_msg));
+        }
+        error
     }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let Some(hint_span) = self.hint_span {
+        if let Some((hint_msg, hint_span)) = &self.hint {
             write!(
                 f,
-                "{} at {:?} (hint: {:?})",
+                "{} at {:?} ({} at {:?})",
                 self.msg,
                 self.span.start(),
+                hint_msg,
                 hint_span.start()
             )
         } else {
@@ -57,13 +65,15 @@ fn check_head(
     })?;
     if head.args.len() != decl.parameters.len() {
         let msg = format!(
-            "Wrong number of arguments: expected {}, found {}.",
+            "Wrong number of arguments for {}: expected {}, found {}.",
+            head.predicate,
+            decl.parameters.len(),
             head.args.len(),
-            decl.parameters.len()
         );
         return Err(Error::with_hint_span(
             msg,
             head.predicate.span(),
+            format!("The predicate {} was declared here.", head.predicate),
             decl.name.span(),
         ));
     }
@@ -86,13 +96,15 @@ fn check_body(
             past::ArgList::Positional(positional_args) => {
                 if positional_args.len() != decl.parameters.len() {
                     let msg = format!(
-                        "Wrong number of arguments: expected {}, found {}.",
+                        "Wrong number of arguments for {}: expected {}, found {}.",
+                        literal.predicate,
                         positional_args.len(),
                         decl.parameters.len()
                     );
                     return Err(Error::with_hint_span(
                         msg,
                         literal.predicate.span(),
+                        format!("The predicate {} was declared here.", decl.name),
                         decl.name.span(),
                     ));
                 }
@@ -131,8 +143,11 @@ fn check_body(
                 }
                 for key in kwargs.keys() {
                     if !used_parameters.contains(key) {
+                        let available_parameters: Vec<_> = used_parameters.iter().map(|parameter| parameter.to_string()).collect();
                         return Err(Error::new(
-                            format!("Unknown parameter {} in predicate.", key),
+                            format!("Unknown parameter {} in predicate {}. Available parameters are: {}.",
+                                key, literal.predicate, available_parameters.join(","),
+                            ),
                             literal.predicate.span(),
                         ));
                     }
