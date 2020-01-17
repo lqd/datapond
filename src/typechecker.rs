@@ -147,8 +147,9 @@ fn check_body(
                 }
                 for key in kwargs.keys() {
                     if !available_parameters.contains(key) {
-                        let available_parameters: Vec<_> =
+                        let mut available_parameters: Vec<_> =
                             available_parameters.into_iter().collect();
+                        available_parameters.sort();
                         let parameter_span = kwargs[key].param.span();
                         return Err(Error::new(
                             format!("Unknown parameter {} in predicate {}. Available parameters are: {}.",
