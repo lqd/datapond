@@ -1,7 +1,7 @@
+use crate::data_structures::OrderedMap;
 use crate::{ast, parser, typechecker};
 use quote::ToTokens;
 use rustc_hash::{FxHashMap, FxHashSet};
-use crate::data_structures::OrderedMap;
 use std::fmt::{self, Write};
 
 type HashMap<K, V> = OrderedMap<K, V>;
