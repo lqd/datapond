@@ -1,0 +1,11 @@
+error: Wrong number of arguments for inp: expected 2, found 3.
+ --> $DIR/arg_mismatch.rs:9:22
+  |
+9 |         out(x, y) :- inp(y, x).
+  |                      ^^^
+
+error: The predicate inp was declared here.
+ --> $DIR/arg_mismatch.rs:7:15
+  |
+7 |         input inp(x: u32, y: u32, z: u32)
+  |               ^^^

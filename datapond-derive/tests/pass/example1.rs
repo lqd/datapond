@@ -1,12 +1,22 @@
-use datapond;
-use std::env;
+use datapond_derive::datapond;
+
+#[derive(PartialOrd, Ord, PartialEq, Eq, Clone, Copy)]
+struct Origin(u64);
+#[derive(PartialOrd, Ord, PartialEq, Eq, Clone, Copy)]
+struct Loan(u64);
+#[derive(PartialOrd, Ord, PartialEq, Eq, Clone, Copy)]
+struct Point(u64);
+
 
 fn main() {
-    if env::var("RUST_LOG").is_ok() {
-        start_logging().expect("Initializing logger failed");
-    }
-
-    let text = r#"
+    let borrow_region = vec![];
+    let cfg_edge = vec![];
+    let killed = vec![];
+    let outlives = vec![];
+    let region_live_at = vec![];
+    let invalidates = vec![];
+    let errors;
+    datapond! {
         input borrow_region(O: Origin, L: Loan, P: Point)
         input cfg_edge(P: Point, Q: Point)
         input killed(L: Loan, P: Point)
@@ -66,32 +76,6 @@ fn main() {
         errors(L, P) :-
           borrow_live_at(L, P),
           invalidates(L, P).
-    "#;
-
-    let output = datapond::generate_skeleton_datafrog(text);
-    println!("{}", output);
-}
-
-use log::{Level, LevelFilter, Metadata, Record, SetLoggerError};
-
-struct Logger;
-
-impl log::Log for Logger {
-    fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= Level::Info
-    }
-
-    fn log(&self, record: &Record) {
-        if self.enabled(record.metadata()) {
-            eprintln!("{} {} - {}", record.level(), record.target(), record.args());
-        }
-    }
-
-    fn flush(&self) {}
-}
-
-static LOGGER: Logger = Logger;
-
-fn start_logging() -> Result<(), SetLoggerError> {
-    log::set_logger(&LOGGER).map(|()| log::set_max_level(LevelFilter::Info))
+    };
+    assert!(errors.is_empty());
 }

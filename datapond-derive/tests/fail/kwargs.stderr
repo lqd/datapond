@@ -1,0 +1,11 @@
+error: Parameter already bound: y
+ --> $DIR/kwargs.rs:9:33
+  |
+9 |         out(x, y) :- inp(.y=y, .y=x).
+  |                                 ^
+
+error: Unknown parameter a in predicate inp. Available parameters are: x,y,z.
+  --> $DIR/kwargs.rs:20:27
+   |
+20 |         out(x, y) :- inp(.a=y, .y=x).
+   |                           ^

@@ -1,8 +1,8 @@
 //! This file contains the typed AST.
 
+use crate::data_structures::OrderedMap;
 use proc_macro2::Ident;
 use quote::ToTokens;
-use std::collections::HashMap;
 use std::fmt;
 
 /// The predicate kind regarding IO.
@@ -98,6 +98,21 @@ pub enum Arg {
     Wildcard,
 }
 
+impl Arg {
+    pub fn to_ident(&self) -> syn::Ident {
+        match self {
+            Arg::Ident(ident) => ident.clone(),
+            Arg::Wildcard => syn::Ident::new("_", proc_macro2::Span::call_site()),
+        }
+    }
+    pub fn is_wildcard(&self) -> bool {
+        match self {
+            Arg::Ident(_) => false,
+            Arg::Wildcard => true,
+        }
+    }
+}
+
 impl fmt::Display for Arg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -188,6 +203,6 @@ impl fmt::Display for Rule {
 /// A Datalog program.
 #[derive(Debug, Clone)]
 pub struct Program {
-    pub decls: HashMap<String, PredicateDecl>,
+    pub decls: OrderedMap<String, PredicateDecl>,
     pub rules: Vec<Rule>,
 }

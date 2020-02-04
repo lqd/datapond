@@ -1,0 +1,13 @@
+[package]
+name = "datapond-derive"
+version = "0.1.0"
+authors = ["Vytautas Astrauskas <vastrauskas@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+proc-macro-hack = "0.5"
+datapond-macro = { path = "../datapond-macro" }
+
+[dev-dependencies]
+trybuild = "1.0"
+datafrog = "2"

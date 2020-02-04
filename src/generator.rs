@@ -1,8 +1,10 @@
+use crate::data_structures::OrderedMap;
 use crate::{ast, parser, typechecker};
 use quote::ToTokens;
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::collections::HashMap;
 use std::fmt::{self, Write};
+
+type HashMap<K, V> = OrderedMap<K, V>;
 
 /// The representation of what a datalog rule does in datafrog terms
 enum Operation {
@@ -909,26 +911,25 @@ fn generate_skeleton_code(
             let relation_args = join_args_as_tuple(&declared_args, &key, &args);
             format!("({}, _)", relation_args)
         } else {
-            let arg_names: Vec<_> = indexed_literal
-                .args
-                .iter()
-                .map(|v| v.to_string())
-                .collect();
-            
+            let arg_names: Vec<_> = indexed_literal.args.iter().map(|v| v.to_string()).collect();
+
             let canonicalized_key: Vec<_> = key
                 .iter()
                 .map(|v| canonicalize_arg_name(&decls, &indexed_literal.predicate, &arg_names, v))
                 .collect();
-                
+
             let canonicalized_args: Vec<_> = args
                 .iter()
                 .map(|v| canonicalize_arg_name(&decls, &indexed_literal.predicate, &arg_names, v))
                 .collect();
-                
-            produced_key = join_args_as_tuple(&canonicalized_key, &canonicalized_key, &canonicalized_args);
-            produced_args = join_args_as_tuple(&canonicalized_args, &canonicalized_key, &canonicalized_args);
 
-            let relation_args = join_args_as_tuple(&declared_args, &canonicalized_key, &canonicalized_args);
+            produced_key =
+                join_args_as_tuple(&canonicalized_key, &canonicalized_key, &canonicalized_args);
+            produced_args =
+                join_args_as_tuple(&canonicalized_args, &canonicalized_key, &canonicalized_args);
+
+            let relation_args =
+                join_args_as_tuple(&declared_args, &canonicalized_key, &canonicalized_args);
 
             relation_args
         };
@@ -1073,13 +1074,10 @@ fn find_arg_decl<'a>(
     args: &Vec<String>,
     variable: &str,
 ) -> &'a ast::ParamDecl {
-    let idx = args
-        .iter()
-        .position(|arg| arg == variable)
-        .expect(&format!(
-            "Couldn't find variable {:?} in the specified args: {:?}",
-            variable, args
-        ));
+    let idx = args.iter().position(|arg| arg == variable).expect(&format!(
+        "Couldn't find variable {:?} in the specified args: {:?}",
+        variable, args
+    ));
 
     let predicate_arg_decls = &global_decls[&predicate.to_string()];
     let arg_decl = &predicate_arg_decls.parameters[idx];

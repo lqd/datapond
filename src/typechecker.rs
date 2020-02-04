@@ -1,4 +1,5 @@
 use crate::ast;
+use crate::data_structures::OrderedMap;
 use crate::parser::ast as past;
 use proc_macro2::Span;
 use std::collections::{HashMap, HashSet};
@@ -8,7 +9,7 @@ use std::fmt;
 pub struct Error {
     pub msg: String,
     pub span: Span,
-    pub hint_span: Option<Span>,
+    pub hint: Option<(String, Span)>,
 }
 
 impl Error {
@@ -16,26 +17,34 @@ impl Error {
         Self {
             msg: msg,
             span: span,
-            hint_span: None,
+            hint: None,
         }
     }
-    fn with_hint_span(msg: String, span: Span, hint_span: Span) -> Self {
+    fn with_hint_span(msg: String, span: Span, hint_msg: String, hint_span: Span) -> Self {
         Self {
             msg: msg,
             span: span,
-            hint_span: Some(hint_span),
+            hint: Some((hint_msg, hint_span)),
         }
+    }
+    pub fn to_syn_error(&self) -> syn::Error {
+        let mut error = syn::Error::new(self.span, &self.msg);
+        if let Some((hint_msg, hint_span)) = &self.hint {
+            error.combine(syn::Error::new(hint_span.clone(), hint_msg));
+        }
+        error
     }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let Some(hint_span) = self.hint_span {
+        if let Some((hint_msg, hint_span)) = &self.hint {
             write!(
                 f,
-                "{} at {:?} (hint: {:?})",
+                "{} at {:?} ({} at {:?})",
                 self.msg,
                 self.span.start(),
+                hint_msg,
                 hint_span.start()
             )
         } else {
@@ -46,7 +55,7 @@ impl fmt::Display for Error {
 
 fn check_head(
     head: &past::RuleHead,
-    decls: &HashMap<String, ast::PredicateDecl>,
+    decls: &OrderedMap<String, ast::PredicateDecl>,
 ) -> Result<(), Error> {
     let decl = decls.get(&head.predicate.to_string()).ok_or_else(|| {
         Error::new(
@@ -56,13 +65,15 @@ fn check_head(
     })?;
     if head.args.len() != decl.parameters.len() {
         let msg = format!(
-            "Wrong number of arguments: expected {}, found {}.",
+            "Wrong number of arguments for {}: expected {}, found {}.",
+            head.predicate,
+            decl.parameters.len(),
             head.args.len(),
-            decl.parameters.len()
         );
         return Err(Error::with_hint_span(
             msg,
             head.predicate.span(),
+            format!("The predicate {} was declared here.", head.predicate),
             decl.name.span(),
         ));
     }
@@ -71,7 +82,7 @@ fn check_head(
 
 fn check_body(
     body: Vec<past::Literal>,
-    decls: &HashMap<String, ast::PredicateDecl>,
+    decls: &OrderedMap<String, ast::PredicateDecl>,
 ) -> Result<Vec<ast::Literal>, Error> {
     let mut new_body = Vec::new();
     for literal in body {
@@ -85,13 +96,15 @@ fn check_body(
             past::ArgList::Positional(positional_args) => {
                 if positional_args.len() != decl.parameters.len() {
                     let msg = format!(
-                        "Wrong number of arguments: expected {}, found {}.",
+                        "Wrong number of arguments for {}: expected {}, found {}.",
+                        literal.predicate,
                         positional_args.len(),
                         decl.parameters.len()
                     );
                     return Err(Error::with_hint_span(
                         msg,
                         literal.predicate.span(),
+                        format!("The predicate {} was declared here.", decl.name),
                         decl.name.span(),
                     ));
                 }
@@ -104,39 +117,48 @@ fn check_body(
                     .collect()
             }
             past::ArgList::Named(named_args) => {
-                let kwargs: HashMap<_, _> = named_args
-                    .into_iter()
-                    .map(|named_arg| (named_arg.param.to_string(), named_arg.arg))
-                    .collect();
-                let mut args = Vec::new();
+                let mut kwargs = HashMap::new();
                 let mut used_parameters = HashSet::new();
+                for named_arg in named_args {
+                    let param_name = named_arg.param.to_string();
+                    if used_parameters.contains(&param_name) {
+                        return Err(Error::new(
+                            format!("Parameter already bound: {}", param_name),
+                            named_arg.param.span(),
+                        ));
+                    }
+                    used_parameters.insert(param_name.clone());
+                    kwargs.insert(param_name, named_arg);
+                }
+                let mut args = Vec::new();
+                let mut available_parameters = HashSet::new();
                 for parameter in &decl.parameters {
                     let param_name = parameter.name.to_string();
                     let arg = match kwargs.get(&param_name) {
-                        Some(ident) => {
+                        Some(past::NamedArg { arg: ident, .. }) => {
                             let ident_str = ident.to_string();
-                            if used_parameters.contains(&ident_str) {
-                                return Err(Error::new(
-                                    format!("Parameter already bound: {}", ident_str),
-                                    ident.span(),
-                                ));
-                            }
                             used_parameters.insert(ident_str);
                             ast::Arg::Ident(ident.clone())
                         }
                         None => ast::Arg::Wildcard,
                     };
+                    available_parameters.insert(param_name);
                     args.push(arg);
                 }
                 for key in kwargs.keys() {
-                    if !used_parameters.contains(key) {
+                    if !available_parameters.contains(key) {
+                        let mut available_parameters: Vec<_> =
+                            available_parameters.into_iter().collect();
+                        available_parameters.sort();
+                        let parameter_span = kwargs[key].param.span();
                         return Err(Error::new(
-                            format!("Unknown parameter {} in predicate.", key),
-                            literal.predicate.span(),
+                            format!("Unknown parameter {} in predicate {}. Available parameters are: {}.",
+                                key, literal.predicate, available_parameters.join(","),
+                            ),
+                            parameter_span,
                         ));
                     }
                 }
-                if kwargs.len() != used_parameters.len() {}
                 args
             }
         };
@@ -151,7 +173,7 @@ fn check_body(
 }
 
 pub(crate) fn typecheck(program: past::Program) -> Result<ast::Program, Error> {
-    let mut decls = HashMap::new();
+    let mut decls = OrderedMap::new();
     let mut rules = Vec::new();
 
     for item in program.items {
