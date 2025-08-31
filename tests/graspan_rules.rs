@@ -47,11 +47,6 @@ let minus_m = iteration.variable::<(u32, u32)>("minus_m");
 fd.extend(d.iter().clone());
 
 while iteration.changed() {
-
-    // Index maintenance
-
-    // Rules
-
     // R01: mfd(l1, l2) :- minus_m(l3, l1), fd(l3, l2).
     mfd.from_join(&minus_m, &fd, |&_l3, &l1, &l2| (l1, l2));
 
@@ -106,10 +101,6 @@ fn ensure_generated_rules_build() {
         fd.extend(d.iter().clone());
 
         while iteration.changed() {
-            // Index maintenance
-
-            // Rules
-
             // R01: mfd(l1, l2) :- minus_m(l3, l1), fd(l3, l2).
             mfd.from_join(&minus_m, &fd, |&_l3, &l1, &l2| (l1, l2));
 

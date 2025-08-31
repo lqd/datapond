@@ -909,8 +909,10 @@ fn generate_skeleton_code(
     writeln!(output, "while iteration.changed() {{")?;
 
     // Intensional indices maintenance
-    writeln!(output, "")?;
-    writeln!(output, "    // Index maintenance")?;
+    if !intensional_indices.is_empty() {
+        writeln!(output, "")?;
+        writeln!(output, "    // Index maintenance")?;
+    }
     for (index_relation, (indexed_literal, key, args)) in intensional_indices.iter() {
         let original_relation = &indexed_literal.predicate;
 
@@ -965,10 +967,13 @@ fn generate_skeleton_code(
         )?;
     }
 
-    // Finally, output the computation rules
-    writeln!(output, "")?;
-    writeln!(output, "    // Rules")?;
-    writeln!(output, "")?;
+    // Finally, output the computation rules. Only announce them in a comment if we need to
+    // differentiate them from the index maintenance.
+    if !intensional_indices.is_empty() {
+        writeln!(output, "")?;
+        writeln!(output, "    // Rules")?;
+        writeln!(output, "")?;
+    }
     for line in generated_code_dynamic_computation {
         if line.is_empty() {
             writeln!(output, "")?;
