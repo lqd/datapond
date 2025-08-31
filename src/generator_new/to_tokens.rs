@@ -88,11 +88,11 @@ impl ToTokens for ReorderOp {
     }
 }
 
-impl ToTokens for BindVarOp {
-    fn to_tokens(&self, _tokens: &mut TokenStream) {
-        unimplemented!();
-    }
-}
+// impl ToTokens for BindVarOp {
+//     fn to_tokens(&self, _tokens: &mut TokenStream) {
+//         unimplemented!();
+//     }
+// }
 
 impl ToTokens for JoinOp {
     fn to_tokens(&self, tokens: &mut TokenStream) {
@@ -145,11 +145,11 @@ impl ToTokens for AntiJoinOp {
     }
 }
 
-impl ToTokens for FilterOp {
-    fn to_tokens(&self, _tokens: &mut TokenStream) {
-        unimplemented!();
-    }
-}
+// impl ToTokens for FilterOp {
+//     fn to_tokens(&self, _tokens: &mut TokenStream) {
+//         unimplemented!();
+//     }
+// }
 
 impl ToTokens for InsertOp {
     fn to_tokens(&self, tokens: &mut TokenStream) {

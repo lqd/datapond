@@ -161,18 +161,18 @@ pub(crate) struct ReorderOp {
     pub output_vars: DVars,
 }
 
-/// An operation that evaluates the given expression and adds it as a last output variable.
-#[derive(Debug)]
-pub(crate) struct BindVarOp {
-    /// A variable into which we write the result.
-    pub output: Variable,
-    /// A variable from which we read the input.
-    pub input: Variable,
-    /// Input variables that are copied to output and potentially used for evaluating `expr`.
-    pub vars: DVarTuple,
-    /// The expression whose result is bound to a new variable.
-    pub expr: syn::Expr,
-}
+// /// An operation that evaluates the given expression and adds it as a last output variable.
+// #[derive(Debug)]
+// pub(crate) struct BindVarOp {
+//     /// A variable into which we write the result.
+//     pub output: Variable,
+//     /// A variable from which we read the input.
+//     pub input: Variable,
+//     /// Input variables that are copied to output and potentially used for evaluating `expr`.
+//     pub vars: DVarTuple,
+//     /// The expression whose result is bound to a new variable.
+//     pub expr: syn::Expr,
+// }
 
 /// An operation that joins two variables.
 #[derive(Debug)]
@@ -206,15 +206,15 @@ pub(crate) struct AntiJoinOp {
     pub value: DVarTuple,
 }
 
-/// An operation that filters out facts.
-#[derive(Debug)]
-pub(crate) struct FilterOp {
-    /// A variable which we want to filter.
-    pub variable: Variable,
-    pub vars: DVars,
-    /// A boolean expression used for filtering.
-    pub expr: syn::Expr,
-}
+// /// An operation that filters out facts.
+// #[derive(Debug)]
+// pub(crate) struct FilterOp {
+//     /// A variable which we want to filter.
+//     pub variable: Variable,
+//     pub vars: DVars,
+//     /// A boolean expression used for filtering.
+//     pub expr: syn::Expr,
+// }
 
 /// An operation that inserts the relation into a variable.
 #[derive(Debug)]
