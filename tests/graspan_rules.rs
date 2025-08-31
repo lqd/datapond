@@ -30,8 +30,8 @@ fn generate_graspan_rules() {
     let expected = r#"
 // Extensional predicates, and their indices
 
-let d: datafrog::Relation<(u32, u32)> = Vec::new().into();
-let minus_a: datafrog::Relation<(u32, u32)> = Vec::new().into();
+let d: datafrog::Relation<(u32, u32)> = d.into();
+let minus_a: datafrog::Relation<(u32, u32)> = minus_a.into();
 
 let (mfd, minus_m, fd) = {
 
@@ -84,14 +84,16 @@ while iteration.changed() {
 
 #[allow(dead_code, unused_variables)]
 fn ensure_generated_rules_build() {
-    // shim to bring in datafrog so that the generated skeleton can build.
+    // shim to simulate inputs so that the generated skeleton can build.
+    let d = Vec::new();
+    let minus_a = Vec::new();
 
     // ----- output from the skeleton generator follows below (+ manual comments) -----
 
     // Extensional predicates, and their indices
 
-    let d: datafrog::Relation<(u32, u32)> = Vec::new().into();
-    let minus_a: datafrog::Relation<(u32, u32)> = Vec::new().into();
+    let d: datafrog::Relation<(u32, u32)> = d.into();
+    let minus_a: datafrog::Relation<(u32, u32)> = minus_a.into();
 
     let (mfd, minus_m, fd) = {
         let mut iteration = datafrog::Iteration::new();
