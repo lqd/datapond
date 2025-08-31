@@ -5,6 +5,9 @@ use pretty_assertions::assert_eq;
 fn generate_cspa_rules() {
     // Context-sensitive Points-to Analysis rules
     // adapted from http://pages.cs.wisc.edu/~aws/papers/vldb19.pdf p. 9
+    //
+    // Technically, these are also adapted from the GRASPAN rules, but are slightly different from
+    // the dedicated test.
 
     let text = r#"
         input assign(a: u32, b: u32)
