@@ -823,7 +823,7 @@ fn generate_skeleton_code(
 
             writeln!(
                 output,
-                "let {relation}: datafrog::Relation<({arg_types})> = Vec::new().into();",
+                "let {relation}: datafrog::Relation<({arg_types})> = {relation}.into();",
             )?;
         } else {
             // This is an index over an extensional predicate
