@@ -51,16 +51,16 @@ struct MapStep {
     dest_args: String,
 }
 
-pub fn generate_skeleton_datafrog(text: &str) -> String {
+pub fn generate_skeleton_datafrog(text: &str, debug: bool) -> String {
     let mut output = String::new();
-    generate_skeleton_into(text, &mut output);
+    generate_skeleton_into(text, &mut output, debug);
 
     // tidy up: filter multiple empty lines in a row
     let filtered = output.replace("\n\n\n", "\n\n");
     filtered
 }
 
-fn generate_skeleton_into(text: &str, output: &mut String) {
+fn generate_skeleton_into(text: &str, output: &mut String, debug: bool) {
     // Step 0: parse everything.
     let program = parser::parse(text);
     let program = match typechecker::typecheck(program) {
@@ -721,53 +721,65 @@ fn generate_skeleton_into(text: &str, output: &mut String) {
         .cloned()
         .collect();
 
-    println!(
-        "{} extensional predicates/indices used (out of {}) and which can be a datafrog `Relation`:",
-        extensional_used_as_relations.len(),
-        extensional.len(),
-    );
+    let extensional_used_as_relations_len = extensional_used_as_relations.len();
+    let extensional_inputs_used_as_variables_len = extensional_inputs_used_as_variables.len();
+    let intensional_len = intensional.len();
+
     let mut relations: Vec<_> = extensional_used_as_relations.into_iter().collect();
     relations.sort();
-    for (idx, relation) in relations.iter().enumerate() {
-        let is_index = match extensional_indices.get(relation) {
-            Some((original_predicate, ..)) => format!(" (index on `{}`)", original_predicate),
-            None => "".to_string(),
-        };
-
-        println!("{:02}: `{}`{}", idx + 1, relation, is_index);
-    }
-
-    println!(
-        "\n{} extensional predicates used as the first relation of a join, requiring a datafrog `Variable`:",
-        extensional_inputs_used_as_variables.len(),
-    );
-    let mut variables_duplicating_relations: Vec<_> =
-        extensional_inputs_used_as_variables.into_iter().collect();
-    variables_duplicating_relations.sort();
-    for (idx, relation) in variables_duplicating_relations.iter().enumerate() {
-        let is_index = match extensional_indices.get(relation) {
-            Some((original_predicate, ..)) => format!(" (index on `{}`)", original_predicate),
-            None => "".to_string(),
-        };
-
-        println!("{:02}: `{}`{}", idx + 1, relation, is_index);
-    }
-
-    println!(
-        "\n{} intensional predicates (including {} indices) requiring a datafrog `Variable`:",
-        intensional.len(),
-        intensional_indices.len(),
-    );
 
     let mut variables: Vec<_> = intensional.into_iter().collect();
     variables.sort();
-    for (idx, variable) in variables.iter().enumerate() {
-        let is_index = match intensional_indices.get(variable) {
-            Some((original_literal, ..)) => format!(" (index on `{}`)", original_literal.predicate),
-            None => "".to_string(),
-        };
 
-        println!("{:02}: `{}`{}", idx + 1, variable, is_index);
+    let mut variables_duplicating_relations: Vec<_> =
+        extensional_inputs_used_as_variables.into_iter().collect();
+    variables_duplicating_relations.sort();
+
+    if debug {
+        println!(
+            "{} extensional predicates/indices used (out of {}) and which can be a datafrog `Relation`:",
+            extensional_used_as_relations_len,
+            extensional.len(),
+        );
+
+        for (idx, relation) in relations.iter().enumerate() {
+            let is_index = match extensional_indices.get(relation) {
+                Some((original_predicate, ..)) => format!(" (index on `{}`)", original_predicate),
+                None => "".to_string(),
+            };
+
+            println!("{:02}: `{}`{}", idx + 1, relation, is_index);
+        }
+
+        println!(
+            "\n{} extensional predicates used as the first relation of a join, requiring a datafrog `Variable`:",
+            extensional_inputs_used_as_variables_len,
+        );
+        for (idx, relation) in variables_duplicating_relations.iter().enumerate() {
+            let is_index = match extensional_indices.get(relation) {
+                Some((original_predicate, ..)) => format!(" (index on `{}`)", original_predicate),
+                None => "".to_string(),
+            };
+
+            println!("{:02}: `{}`{}", idx + 1, relation, is_index);
+        }
+
+        println!(
+            "\n{} intensional predicates (including {} indices) requiring a datafrog `Variable`:",
+            intensional_len,
+            intensional_indices.len(),
+        );
+
+        for (idx, variable) in variables.iter().enumerate() {
+            let is_index = match intensional_indices.get(variable) {
+                Some((original_literal, ..)) => {
+                    format!(" (index on `{}`)", original_literal.predicate)
+                }
+                None => "".to_string(),
+            };
+
+            println!("{:02}: `{}`{}", idx + 1, variable, is_index);
+        }
     }
 
     generate_skeleton_code(

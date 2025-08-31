@@ -25,7 +25,7 @@ fn generate_graspan_rules() {
         fd(val, loc) :- d(val, loc).
     "#;
 
-    let output = generate_skeleton_datafrog(text);
+    let output = generate_skeleton_datafrog(text, true);
 
     let expected = r#"
 // Extensional predicates, and their indices

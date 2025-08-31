@@ -33,7 +33,7 @@ fn generate_cspa_rules() {
         memory_alias(x, x) :- assign(x, y).
     "#;
 
-    let output = generate_skeleton_datafrog(text);
+    let output = generate_skeleton_datafrog(text, true);
 
     let expected = r#"
 // Extensional predicates, and their indices

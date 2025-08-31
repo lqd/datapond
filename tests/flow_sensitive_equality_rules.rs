@@ -74,7 +74,7 @@ fn generate_flow_sensitive_equality_rules() {
           invalidates(L, P).
     "#;
 
-    let output = generate_skeleton_datafrog(text);
+    let output = generate_skeleton_datafrog(text, true);
 
     let expected = r#"
 // Extensional predicates, and their indices
