@@ -823,7 +823,7 @@ fn generate_skeleton_code(
 
             writeln!(
                 output,
-                "let {relation}: Relation<({arg_types})> = Vec::new().into();",
+                "let {relation}: datafrog::Relation<({arg_types})> = Vec::new().into();",
                 relation = relation,
                 arg_types = arg_types,
             )?;
@@ -846,7 +846,7 @@ fn generate_skeleton_code(
             )?;
             writeln!(
                 output,
-                "let {relation}: Relation<({arg_types})> = Vec::new().into();",
+                "let {relation}: datafrog::Relation<({arg_types})> = Vec::new().into();",
                 relation = relation,
                 arg_types = arg_types,
             )?;
@@ -868,7 +868,7 @@ fn generate_skeleton_code(
     }
 
     writeln!(output, "")?;
-    writeln!(output, "let mut iteration = Iteration::new();")?;
+    writeln!(output, "let mut iteration = datafrog::Iteration::new();")?;
 
     writeln!(output, "")?;
     writeln!(output, "// Intensional predicates, and their indices")?;
