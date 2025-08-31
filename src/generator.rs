@@ -967,7 +967,10 @@ fn generate_skeleton_code(
     // Finalize the results of the computation: the relations marked as output.
     if !output_relations.is_empty() {
         writeln!(output, "")?;
-        writeln!(output, "// The computation results: the completed output relations from the program")?;
+        writeln!(
+            output,
+            "// The computation results: the completed output relations from the program"
+        )?;
 
         let completed_relations: Vec<_> = output_relations
             .into_iter()
