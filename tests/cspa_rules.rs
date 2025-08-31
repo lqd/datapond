@@ -43,7 +43,7 @@ let assign_b: Relation<(u32, u32)> = Vec::new().into();
 // Note: `dereference_a` is an indexed version of the input facts `dereference`
 let dereference_a: Relation<(u32, u32)> = Vec::new().into();
 
-// Note: couldn't infer output relation automatically
+// Note: no output relation in the program
 
 let mut iteration = Iteration::new();
 
@@ -146,7 +146,7 @@ fn ensure_generated_rules_build() {
     // Note: `dereference_a` is an indexed version of the input facts `dereference`
     let dereference_a: Relation<(u32, u32)> = Vec::new().into();
 
-    // Note: couldn't infer output relation automatically
+    // Note: no output relation in the program
 
     let mut iteration = Iteration::new();
 

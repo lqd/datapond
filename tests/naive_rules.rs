@@ -40,7 +40,6 @@ let killed: Relation<(Loan, Point)> = Vec::new().into();
 let outlives: Relation<(Origin, Origin, Point)> = Vec::new().into();
 let region_live_at: Relation<((Origin, Point), ())> = Vec::new().into();
 
-// `errors` inferred as the output relation
 let errors = {
 
 let mut iteration = Iteration::new();
@@ -117,6 +116,7 @@ while iteration.changed() {
     errors.from_join(&borrow_live_at, &invalidates, |&(l, p), _, _| (l, p));
 }
 
+// The computation results: the completed output relations from the program
 errors.complete()
 };
 "#;
@@ -152,7 +152,6 @@ where
     let outlives: Relation<(Origin, Origin, Point)> = Vec::new().into();
     let region_live_at: Relation<((Origin, Point), ())> = Vec::new().into();
 
-    // `errors` inferred as the output relation
     let errors = {
         let mut iteration = Iteration::new();
 
@@ -237,6 +236,7 @@ where
             errors.from_join(&borrow_live_at, &invalidates, |&(l, p), _, _| (l, p));
         }
 
+        // The computation results: the completed output relations from the program
         errors.complete()
     };
 }
