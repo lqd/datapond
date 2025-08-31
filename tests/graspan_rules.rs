@@ -132,9 +132,9 @@ fn ensure_generated_rules_build() {
 
         while iteration.changed() {
             // Index maintenance
-            mfd_val.from_map(&mfd, |&(val, loc)| (val, loc));
-            fd_val.from_map(&fd, |&(val, loc)| (val, loc));
-            minus_m_val.from_map(&minus_m, |&(val, loc)| (val, loc));
+            mfd_val.from_map(&mfd, |&(val, loc)| (val, loc)); // useless index
+            fd_val.from_map(&fd, |&(val, loc)| (val, loc)); // useless index
+            minus_m_val.from_map(&minus_m, |&(val, loc)| (val, loc)); // useless index
 
             // Rules
 
