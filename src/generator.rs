@@ -655,11 +655,18 @@ fn generate_skeleton_into(text: &str, output: &mut String) {
         }
     }
 
-    // Infer the output of the computation: the difference between all the intensional
-    // predicates and the ones used as inputs.
-    let main_relation_candidates: Vec<_> = intensional
-        .difference(&intensional_inputs)
-        .cloned()
+    // This datalog program comprises of input, internal, and output relations. We'll need to
+    // finalize the datafrog variables marked as output relations to regular Vecs.
+    let output_relations: Vec<_> = decls
+        .values()
+        .iter()
+        .filter_map(|decl| {
+            if matches!(decl.kind, ast::PredicateKind::Output) {
+                Some(decl.name.to_string())
+            } else {
+                None
+            }
+        })
         .collect();
 
     println!(
@@ -703,7 +710,7 @@ fn generate_skeleton_into(text: &str, output: &mut String) {
         intensional,
         intensional_indices,
         predicates_consumed_as_keys,
-        main_relation_candidates,
+        output_relations,
         generated_code_static_input,
         generated_code_dynamic_computation,
     )
@@ -718,7 +725,7 @@ fn generate_skeleton_code(
     intensional_predicates: Vec<String>,
     intensional_indices: FxHashMap<String, (&ast::Literal, Vec<String>, Vec<String>)>,
     predicates_consumed_as_keys: FxHashSet<String>,
-    main_relation_candidates: Vec<String>,
+    output_relations: Vec<String>,
     generated_code_static_input: Vec<String>,
     generated_code_dynamic_computation: Vec<String>,
 ) -> fmt::Result {
@@ -776,16 +783,15 @@ fn generate_skeleton_code(
 
     writeln!(output, "")?;
 
-    // There can be only one 'main' intensional predicate
-    if main_relation_candidates.len() == 1 {
-        let main = &main_relation_candidates[0];
-        writeln!(output, "// `{}` inferred as the output relation", main)?;
-        writeln!(output, "let {} = {{", main)?;
+    // Emit the local variables to get the result of the datafrog computation.
+    if !output_relations.is_empty() {
+        if output_relations.len() > 1 {
+            writeln!(output, "let ({}) = {{", output_relations.join(", "))?;
+        } else {
+            writeln!(output, "let {} = {{", output_relations[0])?;
+        }
     } else {
-        writeln!(
-            output,
-            "// Note: couldn't infer output relation automatically"
-        )?;
+        writeln!(output, "// Note: no output relation in the program")?;
     }
 
     writeln!(output, "")?;
@@ -958,9 +964,21 @@ fn generate_skeleton_code(
 
     writeln!(output, "}}")?;
 
-    if main_relation_candidates.len() == 1 {
+    // Finalize the results of the computation: the relations marked as output.
+    if !output_relations.is_empty() {
         writeln!(output, "")?;
-        writeln!(output, "{}.complete()", main_relation_candidates[0])?;
+        writeln!(output, "// The computation results: the completed output relations from the program")?;
+
+        let completed_relations: Vec<_> = output_relations
+            .into_iter()
+            .map(|rel| format!("{}.complete()", rel))
+            .collect();
+        if completed_relations.len() > 1 {
+            writeln!(output, "({})", completed_relations.join(", "))?;
+        } else {
+            writeln!(output, "{}", completed_relations[0])?;
+        }
+
         writeln!(output, "}};")?;
     }
 
