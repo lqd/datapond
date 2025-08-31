@@ -824,8 +824,6 @@ fn generate_skeleton_code(
             writeln!(
                 output,
                 "let {relation}: datafrog::Relation<({arg_types})> = Vec::new().into();",
-                relation = relation,
-                arg_types = arg_types,
             )?;
         } else {
             // This is an index over an extensional predicate
@@ -841,14 +839,10 @@ fn generate_skeleton_code(
             writeln!(
                 output,
                 "// Note: `{relation}` is an indexed version of the input facts `{original_predicate}`",
-                relation = relation,
-                original_predicate = original_predicate,
             )?;
             writeln!(
                 output,
                 "let {relation}: datafrog::Relation<({arg_types})> = Vec::new().into();",
-                relation = relation,
-                arg_types = arg_types,
             )?;
             writeln!(output, "")?;
         }
@@ -894,8 +888,6 @@ fn generate_skeleton_code(
             writeln!(
                 output,
                 "let {variable} = iteration.variable::<({arg_types})>({variable:?});",
-                variable = variable,
-                arg_types = arg_types,
             )?;
         } else if let Some((original_literal, key, args)) = intensional_indices.get(variable) {
             // This is an index over an intensional predicate
@@ -904,8 +896,6 @@ fn generate_skeleton_code(
             writeln!(output, "")?;
             writeln!(output,
                 "// Note: `{variable}` is an indexed version of the `{original_predicate}` relation",
-                variable = variable,
-                original_predicate = original_predicate,
             )?;
 
             let arg_names = original_literal
@@ -938,16 +928,10 @@ fn generate_skeleton_code(
             writeln!(
                 output,
                 "let {variable} = iteration.variable::<({variable_type})>({variable:?});",
-                variable = variable,
-                variable_type = variable_type,
             )?;
         } else {
             // This is an intermediary step variable used in joins
-            writeln!(
-                output,
-                "let {variable} = iteration.variable({variable:?});",
-                variable = variable
-            )?;
+            writeln!(output, "let {variable} = iteration.variable({variable:?});",)?;
         }
     }
 
