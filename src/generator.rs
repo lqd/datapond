@@ -7,6 +7,7 @@ use std::fmt::{self, Write};
 type HashMap<K, V> = OrderedMap<K, V>;
 
 /// The representation of what a datalog rule does in datafrog terms
+#[derive(Debug)]
 enum Operation {
     StaticMap(),
     DynamicMap(MapStep),
@@ -297,10 +298,24 @@ fn generate_skeleton_into(text: &str, output: &mut String) {
                     // The "left" relation in the join could come from the previous step,
                     // in that case, there is no specific index to lookup.
                     //
+
+                    // Special case: binary relations. These are already in a `(key, value)` shape
+                    // by construction. If we're joining on their key, they naturally produce the
+                    // value, and we don't need an index.
+                    // TODO: this should be generalized to joins on the full key, regardless of its
+                    // cardinality of course, but that requires knowing a bit more about the
+                    // structure of the relations. Something to do in the new generator, rather than
+                    // here.
+                    let is_simple_binary_join = key.len() == 1
+                        && args_a.len() == 2
+                        && key[0] == args_a[0]
+                        && args_b.len() == 2
+                        && key[0] == args_b[0];
+
                     let src_a = if let Some(ref mut previous_step) = previous_step {
                         previous_step.dest_predicate.clone()
                     } else {
-                        if remaining_args_a.is_empty() {
+                        if remaining_args_a.is_empty() || is_simple_binary_join {
                             body[0].predicate.to_string()
                         } else {
                             generate_index_relation(
@@ -318,7 +333,7 @@ fn generate_skeleton_into(text: &str, output: &mut String) {
                         }
                     };
 
-                    let mut src_b = if remaining_args_b.is_empty() {
+                    let mut src_b = if remaining_args_b.is_empty() || is_simple_binary_join {
                         literal.predicate.to_string()
                     } else {
                         generate_index_relation(
