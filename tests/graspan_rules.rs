@@ -30,12 +30,12 @@ fn generate_graspan_rules() {
     let expected = r#"
 // Extensional predicates, and their indices
 
-let d: Relation<(u32, u32)> = Vec::new().into();
-let minus_a: Relation<(u32, u32)> = Vec::new().into();
+let d: datafrog::Relation<(u32, u32)> = Vec::new().into();
+let minus_a: datafrog::Relation<(u32, u32)> = Vec::new().into();
 
 let (mfd, minus_m, fd) = {
 
-let mut iteration = Iteration::new();
+let mut iteration = datafrog::Iteration::new();
 
 // Intensional predicates, and their indices
 
@@ -85,17 +85,16 @@ while iteration.changed() {
 #[allow(dead_code, unused_variables)]
 fn ensure_generated_rules_build() {
     // shim to bring in datafrog so that the generated skeleton can build.
-    use datafrog::{Iteration, Relation};
 
     // ----- output from the skeleton generator follows below (+ manual comments) -----
 
     // Extensional predicates, and their indices
 
-    let d: Relation<(u32, u32)> = Vec::new().into();
-    let minus_a: Relation<(u32, u32)> = Vec::new().into();
+    let d: datafrog::Relation<(u32, u32)> = Vec::new().into();
+    let minus_a: datafrog::Relation<(u32, u32)> = Vec::new().into();
 
     let (mfd, minus_m, fd) = {
-        let mut iteration = Iteration::new();
+        let mut iteration = datafrog::Iteration::new();
 
         // Intensional predicates, and their indices
 

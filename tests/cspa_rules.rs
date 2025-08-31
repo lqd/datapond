@@ -38,19 +38,19 @@ fn generate_cspa_rules() {
     let expected = r#"
 // Extensional predicates, and their indices
 
-let assign: Relation<(u32, u32)> = Vec::new().into();
+let assign: datafrog::Relation<(u32, u32)> = Vec::new().into();
 
 // Note: `assign_b` is an indexed version of the input facts `assign`
-let assign_b: Relation<(u32, u32)> = Vec::new().into();
+let assign_b: datafrog::Relation<(u32, u32)> = Vec::new().into();
 
-let dereference: Relation<(u32, u32)> = Vec::new().into();
+let dereference: datafrog::Relation<(u32, u32)> = Vec::new().into();
 
 // Note: `dereference_a` is an indexed version of the input facts `dereference`
-let dereference_a: Relation<(u32, u32)> = Vec::new().into();
+let dereference_a: datafrog::Relation<(u32, u32)> = Vec::new().into();
 
 // Note: no output relation in the program
 
-let mut iteration = Iteration::new();
+let mut iteration = datafrog::Iteration::new();
 
 // Intensional predicates, and their indices
 
@@ -133,25 +133,24 @@ while iteration.changed() {
 #[allow(dead_code, unused_variables)]
 fn ensure_generated_rules_build() {
     // shim to bring in datafrog so that the generated skeleton can build.
-    use datafrog::{Iteration, Relation};
 
     // ----- output from the skeleton generator follows below (+ manual comments) -----
 
     // Extensional predicates, and their indices
 
-    let assign: Relation<(u32, u32)> = Vec::new().into();
+    let assign: datafrog::Relation<(u32, u32)> = Vec::new().into();
 
     // Note: `assign_b` is an indexed version of the input facts `assign`
-    let assign_b: Relation<(u32, u32)> = Vec::new().into();
+    let assign_b: datafrog::Relation<(u32, u32)> = Vec::new().into();
 
-    let dereference: Relation<(u32, u32)> = Vec::new().into();
+    let dereference: datafrog::Relation<(u32, u32)> = Vec::new().into();
 
     // Note: `dereference_a` is an indexed version of the input facts `dereference`
-    let dereference_a: Relation<(u32, u32)> = Vec::new().into();
+    let dereference_a: datafrog::Relation<(u32, u32)> = Vec::new().into();
 
     // Note: no output relation in the program
 
-    let mut iteration = Iteration::new();
+    let mut iteration = datafrog::Iteration::new();
 
     // Intensional predicates, and their indices
 

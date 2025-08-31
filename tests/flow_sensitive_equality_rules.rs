@@ -79,23 +79,23 @@ fn generate_flow_sensitive_equality_rules() {
     let expected = r#"
 // Extensional predicates, and their indices
 
-let borrow_region: Relation<(Origin, Loan, Point)> = Vec::new().into();
+let borrow_region: datafrog::Relation<(Origin, Loan, Point)> = Vec::new().into();
 
 // Note: `cfg_edge_p` is an indexed version of the input facts `cfg_edge`
-let cfg_edge_p: Relation<(Point, Point)> = Vec::new().into();
+let cfg_edge_p: datafrog::Relation<(Point, Point)> = Vec::new().into();
 
-let invalidates: Relation<((Loan, Point), ())> = Vec::new().into();
-let killed: Relation<(Loan, Point)> = Vec::new().into();
-let outlives: Relation<(Origin, Origin, Point)> = Vec::new().into();
+let invalidates: datafrog::Relation<((Loan, Point), ())> = Vec::new().into();
+let killed: datafrog::Relation<(Loan, Point)> = Vec::new().into();
+let outlives: datafrog::Relation<(Origin, Origin, Point)> = Vec::new().into();
 
 // Note: `outlives_o1p` is an indexed version of the input facts `outlives`
-let outlives_o1p: Relation<((Origin, Point), Origin)> = Vec::new().into();
+let outlives_o1p: datafrog::Relation<((Origin, Point), Origin)> = Vec::new().into();
 
-let region_live_at: Relation<((Origin, Point), ())> = Vec::new().into();
+let region_live_at: datafrog::Relation<((Origin, Point), ())> = Vec::new().into();
 
 let errors = {
 
-let mut iteration = Iteration::new();
+let mut iteration = datafrog::Iteration::new();
 
 // Intensional predicates, and their indices
 
@@ -211,28 +211,27 @@ where
     Point: Ord + Copy + 'static,
 {
     // shim to bring in datafrog so that the generated skeleton can build.
-    use datafrog::{Iteration, Relation};
 
     // ----- output from the skeleton generator follows below -----
 
     // Extensional predicates, and their indices
 
-    let borrow_region: Relation<(Origin, Loan, Point)> = Vec::new().into();
+    let borrow_region: datafrog::Relation<(Origin, Loan, Point)> = Vec::new().into();
 
     // Note: `cfg_edge_p` is an indexed version of the input facts `cfg_edge`
-    let cfg_edge_p: Relation<(Point, Point)> = Vec::new().into();
+    let cfg_edge_p: datafrog::Relation<(Point, Point)> = Vec::new().into();
 
-    let invalidates: Relation<((Loan, Point), ())> = Vec::new().into();
-    let killed: Relation<(Loan, Point)> = Vec::new().into();
-    let outlives: Relation<(Origin, Origin, Point)> = Vec::new().into();
+    let invalidates: datafrog::Relation<((Loan, Point), ())> = Vec::new().into();
+    let killed: datafrog::Relation<(Loan, Point)> = Vec::new().into();
+    let outlives: datafrog::Relation<(Origin, Origin, Point)> = Vec::new().into();
 
     // Note: `outlives_o1p` is an indexed version of the input facts `outlives`
-    let outlives_o1p: Relation<((Origin, Point), Origin)> = Vec::new().into();
+    let outlives_o1p: datafrog::Relation<((Origin, Point), Origin)> = Vec::new().into();
 
-    let region_live_at: Relation<((Origin, Point), ())> = Vec::new().into();
+    let region_live_at: datafrog::Relation<((Origin, Point), ())> = Vec::new().into();
 
     let errors = {
-        let mut iteration = Iteration::new();
+        let mut iteration = datafrog::Iteration::new();
 
         // Intensional predicates, and their indices
 
