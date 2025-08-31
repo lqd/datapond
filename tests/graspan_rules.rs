@@ -31,9 +31,7 @@ fn generate_graspan_rules() {
 // Extensional predicates, and their indices
 
 let d: Relation<(u32, u32)> = Vec::new().into();
-
-// Note: `minus_a_val` is an indexed version of the input facts `minus_a`
-let minus_a_val: Relation<(u32, u32)> = Vec::new().into();
+let minus_a: Relation<(u32, u32)> = Vec::new().into();
 
 let (mfd, minus_m, fd) = {
 
@@ -42,17 +40,8 @@ let mut iteration = Iteration::new();
 // Intensional predicates, and their indices
 
 let fd = iteration.variable::<(u32, u32)>("fd");
-
-// Note: `fd_val` is an indexed version of the `fd` relation
-let fd_val = iteration.variable::<(u32, u32)>("fd_val");
 let mfd = iteration.variable::<(u32, u32)>("mfd");
-
-// Note: `mfd_val` is an indexed version of the `mfd` relation
-let mfd_val = iteration.variable::<(u32, u32)>("mfd_val");
 let minus_m = iteration.variable::<(u32, u32)>("minus_m");
-
-// Note: `minus_m_val` is an indexed version of the `minus_m` relation
-let minus_m_val = iteration.variable::<(u32, u32)>("minus_m_val");
 
 // R06: fd(val, loc) :- d(val, loc).
 fd.extend(d.iter().clone());
@@ -60,26 +49,23 @@ fd.extend(d.iter().clone());
 while iteration.changed() {
 
     // Index maintenance
-    mfd_val.from_map(&mfd, |&(val, loc)| (val, loc));
-    fd_val.from_map(&fd, |&(val, loc)| (val, loc));
-    minus_m_val.from_map(&minus_m, |&(val, loc)| (val, loc));
 
     // Rules
 
     // R01: mfd(l1, l2) :- minus_m(l3, l1), fd(l3, l2).
-    mfd.from_join(&minus_m_val, &fd_val, |&_l3, &l1, &l2| (l1, l2));
+    mfd.from_join(&minus_m, &fd, |&_l3, &l1, &l2| (l1, l2));
 
     // R02: minus_m(l2, l1) :- fd(l3, l1), fd(l3, l2).
-    minus_m.from_join(&fd_val, &fd_val, |&_l3, &l1, &l2| (l2, l1));
+    minus_m.from_join(&fd, &fd, |&_l3, &l1, &l2| (l2, l1));
 
     // R03: minus_m(l2, l1) :- fd(l3, l1), mfd(l3, l2).
-    minus_m.from_join(&fd_val, &mfd_val, |&_l3, &l1, &l2| (l2, l1));
+    minus_m.from_join(&fd, &mfd, |&_l3, &l1, &l2| (l2, l1));
 
     // R04: fd(val, unk) :- minus_a(loc, val), fd(loc, unk).
-    fd.from_join(&minus_a_val, &fd_val, |&_loc, &val, &unk| (val, unk));
+    fd.from_join(&minus_a, &fd, |&_loc, &val, &unk| (val, unk));
 
     // R05: fd(val, unk) :- minus_a(loc, val), mfd(loc, unk).
-    fd.from_join(&minus_a_val, &mfd_val, |&_loc, &val, &unk| (val, unk));
+    fd.from_join(&minus_a, &mfd, |&_loc, &val, &unk| (val, unk));
 
     // R06: fd(val, loc) :- d(val, loc).
     // `d` is a static input, already loaded into `fd`.
@@ -102,9 +88,7 @@ fn ensure_generated_rules_build() {
     // Extensional predicates, and their indices
 
     let d: Relation<(u32, u32)> = Vec::new().into();
-
-    // Note: `minus_a_val` is an indexed version of the input facts `minus_a`
-    let minus_a_val: Relation<(u32, u32)> = Vec::new().into();
+    let minus_a: Relation<(u32, u32)> = Vec::new().into();
 
     let (mfd, minus_m, fd) = {
         let mut iteration = Iteration::new();
@@ -112,46 +96,34 @@ fn ensure_generated_rules_build() {
         // Intensional predicates, and their indices
 
         let fd = iteration.variable::<(u32, u32)>("fd");
-
-        // Note: `fd_val` is an indexed version of the `fd` relation
-        let fd_val = iteration.variable::<(u32, u32)>("fd_val");
         let mfd = iteration.variable::<(u32, u32)>("mfd");
-
-        // Note: `mfd_val` is an indexed version of the `mfd` relation
-        let mfd_val = iteration.variable::<(u32, u32)>("mfd_val");
         let minus_m = iteration.variable::<(u32, u32)>("minus_m");
 
-        // Note: `minus_m_val` is an indexed version of the `minus_m` relation
-        let minus_m_val = iteration.variable::<(u32, u32)>("minus_m_val");
-
         // hack to make this build, but not work
-        let minus_a_val = iteration.variable::<(u32, u32)>("minus_a_val");
+        let minus_a = iteration.variable::<(u32, u32)>("minus_a");
 
         // R06: fd(val, loc) :- d(val, loc).
         fd.extend(d.iter().clone());
 
         while iteration.changed() {
             // Index maintenance
-            mfd_val.from_map(&mfd, |&(val, loc)| (val, loc)); // useless index
-            fd_val.from_map(&fd, |&(val, loc)| (val, loc)); // useless index
-            minus_m_val.from_map(&minus_m, |&(val, loc)| (val, loc)); // useless index
 
             // Rules
 
             // R01: mfd(l1, l2) :- minus_m(l3, l1), fd(l3, l2).
-            mfd.from_join(&minus_m_val, &fd_val, |&_l3, &l1, &l2| (l1, l2));
+            mfd.from_join(&minus_m, &fd, |&_l3, &l1, &l2| (l1, l2));
 
             // R02: minus_m(l2, l1) :- fd(l3, l1), fd(l3, l2).
-            minus_m.from_join(&fd_val, &fd_val, |&_l3, &l1, &l2| (l2, l1));
+            minus_m.from_join(&fd, &fd, |&_l3, &l1, &l2| (l2, l1));
 
             // R03: minus_m(l2, l1) :- fd(l3, l1), mfd(l3, l2).
-            minus_m.from_join(&fd_val, &mfd_val, |&_l3, &l1, &l2| (l2, l1));
+            minus_m.from_join(&fd, &mfd, |&_l3, &l1, &l2| (l2, l1));
 
             // R04: fd(val, unk) :- minus_a(loc, val), fd(loc, unk).
-            fd.from_join(&minus_a_val, &fd_val, |&_loc, &val, &unk| (val, unk));
+            fd.from_join(&minus_a, &fd, |&_loc, &val, &unk| (val, unk));
 
             // R05: fd(val, unk) :- minus_a(loc, val), mfd(loc, unk).
-            fd.from_join(&minus_a_val, &mfd_val, |&_loc, &val, &unk| (val, unk));
+            fd.from_join(&minus_a, &mfd, |&_loc, &val, &unk| (val, unk));
 
             // R06: fd(val, loc) :- d(val, loc).
             // `d` is a static input, already loaded into `fd`.
