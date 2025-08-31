@@ -87,6 +87,7 @@ fn generate_skeleton_into(text: &str, output: &mut String) {
     // Actually used predicates and indices
     let mut extensional_inputs = FxHashSet::default();
     let mut intensional_inputs = FxHashSet::default();
+    let mut extensional_inputs_used_as_variables = FxHashSet::default();
 
     let mut extensional_indices = FxHashMap::default();
     let mut intensional_indices = FxHashMap::default();
@@ -190,11 +191,6 @@ fn generate_skeleton_into(text: &str, output: &mut String) {
 
                     let is_first_step = step_idx == 0;
                     let is_last_step = literal_idx == body.len() - 1;
-
-                    // TODO: datafrog has requirements that the joined Variable is the first
-                    // argument, so if this is the first (or only) step of a join, the second literal
-                    // should be a Variable (or emit an error), and swap the order here, or maybe also
-                    // emit an error asking to swap in the source directly.
 
                     // When we're at the first step, there is no previous step result with which
                     // to join. But when we're at `literal_idx` of at least 2, we've joined 2
@@ -332,6 +328,42 @@ fn generate_skeleton_into(text: &str, output: &mut String) {
                             )
                         }
                     };
+
+                    if extensional.contains(&src_a) {
+                        // We're using an extensional input that should be a `Relation`, at a spot
+                        // where datafrog expects a `Variable`.
+                        //
+                        // This will fail to build.
+                        //
+                        // Possible solutions:
+                        // - emit a duplicate variable for that relation: that will slow data
+                        //   loading down but will compile
+                        // - emit an error: usually such rules can be transformed to have the static
+                        //   relation as the second literal instead of a join step instead of the
+                        //   first. Changing the join order can have runtime impact depending on the
+                        //   size of the relations.
+                        // - swap the order unconditionally
+                        // - emit a warning, and the duplicate variable
+                        //
+                        // For now, we do this last option.
+                        //
+                        eprintln!(
+                            "warning: input relation `{}` used as the first element of a \
+                                   datafrog join. This requires a duplicate variable in addition \
+                                   to the relation",
+                            src_a
+                        );
+                        eprintln!(
+                            "   note: this can be ignored, although this duplicate will \
+                                      slightly slow down loading data into the computation"
+                        );
+                        eprintln!(
+                            "   note: but can also be avoided by reordering the join steps \
+                                      in rule: `{}`",
+                            rule
+                        );
+                        extensional_inputs_used_as_variables.insert(src_a.clone());
+                    }
 
                     let mut src_b = if remaining_args_b.is_empty() || is_simple_binary_join {
                         literal.predicate.to_string()
@@ -684,14 +716,35 @@ fn generate_skeleton_into(text: &str, output: &mut String) {
         })
         .collect();
 
+    let extensional_used_as_relations: FxHashSet<_> = extensional_inputs
+        .difference(&extensional_inputs_used_as_variables)
+        .cloned()
+        .collect();
+
     println!(
         "{} extensional predicates/indices used (out of {}) and which can be a datafrog `Relation`:",
-        extensional_inputs.len(),
+        extensional_used_as_relations.len(),
         extensional.len(),
     );
-    let mut extensional: Vec<_> = extensional_inputs.into_iter().collect();
-    extensional.sort();
-    for (idx, relation) in extensional.iter().enumerate() {
+    let mut relations: Vec<_> = extensional_used_as_relations.into_iter().collect();
+    relations.sort();
+    for (idx, relation) in relations.iter().enumerate() {
+        let is_index = match extensional_indices.get(relation) {
+            Some((original_predicate, ..)) => format!(" (index on `{}`)", original_predicate),
+            None => "".to_string(),
+        };
+
+        println!("{:02}: `{}`{}", idx + 1, relation, is_index);
+    }
+
+    println!(
+        "\n{} extensional predicates used as the first relation of a join, requiring a datafrog `Variable`:",
+        extensional_inputs_used_as_variables.len(),
+    );
+    let mut variables_duplicating_relations: Vec<_> =
+        extensional_inputs_used_as_variables.into_iter().collect();
+    variables_duplicating_relations.sort();
+    for (idx, relation) in variables_duplicating_relations.iter().enumerate() {
         let is_index = match extensional_indices.get(relation) {
             Some((original_predicate, ..)) => format!(" (index on `{}`)", original_predicate),
             None => "".to_string(),
@@ -706,9 +759,9 @@ fn generate_skeleton_into(text: &str, output: &mut String) {
         intensional_indices.len(),
     );
 
-    let mut intensional: Vec<_> = intensional.into_iter().collect();
-    intensional.sort();
-    for (idx, variable) in intensional.iter().enumerate() {
+    let mut variables: Vec<_> = intensional.into_iter().collect();
+    variables.sort();
+    for (idx, variable) in variables.iter().enumerate() {
         let is_index = match intensional_indices.get(variable) {
             Some((original_literal, ..)) => format!(" (index on `{}`)", original_literal.predicate),
             None => "".to_string(),
@@ -720,10 +773,11 @@ fn generate_skeleton_into(text: &str, output: &mut String) {
     generate_skeleton_code(
         output,
         decls,
-        extensional,
+        relations,
         extensional_indices,
-        intensional,
+        variables,
         intensional_indices,
+        variables_duplicating_relations,
         predicates_consumed_as_keys,
         output_relations,
         generated_code_static_input,
@@ -735,10 +789,11 @@ fn generate_skeleton_into(text: &str, output: &mut String) {
 fn generate_skeleton_code(
     output: &mut String,
     decls: HashMap<String, ast::PredicateDecl>,
-    extensional_predicates: Vec<String>,
+    relations: Vec<String>,
     extensional_indices: FxHashMap<String, (&syn::Ident, String)>,
-    intensional_predicates: Vec<String>,
+    variables: Vec<String>,
     intensional_indices: FxHashMap<String, (&ast::Literal, Vec<String>, Vec<String>)>,
+    variables_duplicating_relations: Vec<String>,
     predicates_consumed_as_keys: FxHashSet<String>,
     output_relations: Vec<String>,
     generated_code_static_input: Vec<String>,
@@ -748,7 +803,10 @@ fn generate_skeleton_code(
     writeln!(output, "// Extensional predicates, and their indices")?;
     writeln!(output, "")?;
 
-    for relation in extensional_predicates.iter() {
+    for relation in relations
+        .iter()
+        .chain(variables_duplicating_relations.iter())
+    {
         if let Some(arg_decls) = decls.get(relation) {
             // This is one the initial extensional predicates
             let arg_types: Vec<_> = arg_decls
@@ -816,7 +874,7 @@ fn generate_skeleton_code(
     writeln!(output, "// Intensional predicates, and their indices")?;
     writeln!(output, "")?;
 
-    for variable in intensional_predicates.iter() {
+    for variable in variables.iter() {
         if let Some(arg_decls) = decls.get(variable) {
             // This is one of the initial intensional predicates
             let arg_types: Vec<_> = arg_decls
@@ -890,6 +948,38 @@ fn generate_skeleton_code(
                 "let {variable} = iteration.variable({variable:?});",
                 variable = variable
             )?;
+        }
+    }
+
+    // Load relations used as variables...
+    if !variables_duplicating_relations.is_empty() {
+        writeln!(output, "")?;
+        writeln!(
+            output,
+            "// Duplicate extensional predicates used as `Variable`s"
+        )?;
+        writeln!(output, "")?;
+
+        for variable in variables_duplicating_relations.iter() {
+            if let Some(arg_decls) = decls.get(variable) {
+                let arg_types: Vec<_> = arg_decls
+                    .parameters
+                    .iter()
+                    .map(|decl| decl.typ_as_string())
+                    .collect();
+                let arg_types = arg_types.join(", ");
+
+                writeln!(output, "let {variable} = {{")?;
+                writeln!(
+                    output,
+                    "    let var = iteration.variable::<({arg_types})>({variable:?});",
+                )?;
+                writeln!(output, "    var.extend({variable}.iter().clone());")?;
+                writeln!(output, "    var")?;
+                writeln!(output, "}};")?;
+            } else {
+                unreachable!();
+            }
         }
     }
 
