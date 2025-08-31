@@ -95,7 +95,7 @@ fn generate_skeleton_into(text: &str, output: &mut String) {
     let mut predicates_consumed_as_keys = FxHashSet::default();
 
     // The skeleton code:
-    // - the inital data loading, before the loop, to fill the `Variable`s with
+    // - the initial data loading, before the loop, to fill the `Variable`s with
     //   data from the `Relation`s they join with in the rules.
     // - the dynamic computation data: the loop itself, executing the joins
     let mut generated_code_static_input: Vec<String> = Vec::new();
@@ -223,7 +223,7 @@ fn generate_skeleton_into(text: &str, output: &mut String) {
                     intensional.insert(dest_predicate.clone());
 
                     // The arguments to the source literals can either come from the
-                    // first 2 literals in the body (at the firs step of the join),
+                    // first 2 literals in the body (at the first step of the join),
                     // or from the previous step's result and current step's literal.
                     let args_a: Vec<String> = if let Some(ref mut previous_step) = previous_step {
                         previous_step
