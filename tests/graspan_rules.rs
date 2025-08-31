@@ -43,6 +43,14 @@ let fd = iteration.variable::<(u32, u32)>("fd");
 let mfd = iteration.variable::<(u32, u32)>("mfd");
 let minus_m = iteration.variable::<(u32, u32)>("minus_m");
 
+// Duplicate extensional predicates used as `Variable`s
+
+let minus_a = {
+    let var = iteration.variable::<(u32, u32)>("minus_a");
+    var.extend(minus_a.iter().clone());
+    var
+};
+
 // R06: fd(val, loc) :- d(val, loc).
 fd.extend(d.iter().clone());
 
@@ -80,6 +88,7 @@ fn ensure_generated_rules_build() {
     use datafrog::{Iteration, Relation};
 
     // ----- output from the skeleton generator follows below (+ manual comments) -----
+
     // Extensional predicates, and their indices
 
     let d: Relation<(u32, u32)> = Vec::new().into();
@@ -94,8 +103,13 @@ fn ensure_generated_rules_build() {
         let mfd = iteration.variable::<(u32, u32)>("mfd");
         let minus_m = iteration.variable::<(u32, u32)>("minus_m");
 
-        // hack to make this build, but not work
-        let minus_a = iteration.variable::<(u32, u32)>("minus_a");
+        // Duplicate extensional predicates used as `Variable`s
+
+        let minus_a = {
+            let var = iteration.variable::<(u32, u32)>("minus_a");
+            var.extend(minus_a.iter().clone());
+            var
+        };
 
         // R06: fd(val, loc) :- d(val, loc).
         fd.extend(d.iter().clone());
