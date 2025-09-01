@@ -1045,11 +1045,6 @@ fn generate_skeleton_code(
 
         writeln!(output,
             "    {index_relation}.from_map(&{original_relation}, |&{relation_args}| ({produced_key}, {produced_args}));",
-            index_relation = index_relation,
-            original_relation = original_relation,
-            relation_args = relation_args,
-            produced_key = produced_key,
-            produced_args = produced_args,
         )?;
     }
 
