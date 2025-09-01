@@ -1065,6 +1065,8 @@ fn generate_skeleton_code(
                     })
                     .collect();
 
+                // `args` is weird here, but there are no test changes with `canonicalized_args`, so
+                // coverage is weak and needs to be improved.
                 produced_key = join_args_as_tuple(&canonicalized_key, &canonicalized_key, &args);
                 produced_args = join_args_as_tuple(
                     &canonicalized_args,
