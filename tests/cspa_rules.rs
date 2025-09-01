@@ -189,8 +189,8 @@ fn ensure_generated_rules_build() {
     while iteration.changed() {
         // Index maintenance
         value_flow_b.from_map(&value_flow, |&(a, b)| (b, a));
-        value_flow_a.from_map(&value_flow, |&(a, b)| (a, b));
-        memory_alias_a.from_map(&memory_alias, |&(a, b)| (a, b));
+        value_flow_a.from_map(&value_flow, |&(a, b)| (a, b)); // useless index
+        memory_alias_a.from_map(&memory_alias, |&(a, b)| (a, b));  // useless index
 
         // Rules
 
