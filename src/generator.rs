@@ -973,6 +973,14 @@ fn generate_skeleton_code(
                 writeln!(output, "    var.extend({variable}.iter().clone());")?;
                 writeln!(output, "    var")?;
                 writeln!(output, "}};")?;
+            } else if let Some((_original_literal, key, _args)) = intensional_indices.get(variable)
+            {
+                // This is an index over an intensional predicate?!
+                todo!(
+                    "relation `{}` used as variable, and indexed on `{}`",
+                    variable,
+                    key.join(", "),
+                );
             } else {
                 unreachable!();
             }
