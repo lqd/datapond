@@ -36,16 +36,24 @@ let input_p: datafrog::Relation<(u32, u32)> = input_p.into();
 let input_q: datafrog::Relation<(u32, u32, u32)> = input_q.into();
 
 // Note: `r_d` is an indexed version of the input facts `r`
-let r_d: datafrog::Relation<(u32, (u32, u32))> = Vec::new().into();
+let r_d: datafrog::Relation<(u32, (u32, u32))> = datafrog::Relation::from_iter(
+    r.iter().map(|&(d, e, f)| (d, (e, f)))
+);
 
 // Note: `s_x` is an indexed version of the input facts `s`
-let s_x: datafrog::Relation<(u32, u32)> = Vec::new().into();
+let s_x: datafrog::Relation<(u32, u32)> = datafrog::Relation::from_iter(
+    s.iter().map(|&(x, y)| (x, y))
+);
 
 // Note: `u_s` is an indexed version of the input facts `u`
-let u_s: datafrog::Relation<(u32, (u32, u32))> = Vec::new().into();
+let u_s: datafrog::Relation<(u32, (u32, u32))> = datafrog::Relation::from_iter(
+    u.iter().map(|&(s, t, u)| (s, (t, u)))
+);
 
 // Note: `c_b` is an indexed version of the input facts `c`
-let c_b: datafrog::Relation<(u32, (u32, u32))> = Vec::new().into();
+let c_b: datafrog::Relation<(u32, (u32, u32))> = datafrog::Relation::from_iter(
+    c.iter().map(|&(a, b, c)| (b, (a, c)))
+);
 
 let (p, q) = {
 
@@ -157,16 +165,20 @@ fn ensure_generated_rules_build() {
     let input_q: datafrog::Relation<(u32, u32, u32)> = input_q.into();
 
     // Note: `r_d` is an indexed version of the input facts `r`
-    let r_d: datafrog::Relation<(u32, (u32, u32))> = Vec::new().into();
+    let r_d: datafrog::Relation<(u32, (u32, u32))> =
+        datafrog::Relation::from_iter(r.iter().map(|&(d, e, f)| (d, (e, f))));
 
-    // Note: `s_x` is an indexed version of the input facts `s`
-    let s_x: datafrog::Relation<(u32, u32)> = Vec::new().into();
+    // Note: `s_x` is an indexed version of the input facts `s` // useless index
+    let s_x: datafrog::Relation<(u32, u32)> =
+        datafrog::Relation::from_iter(s.iter().map(|&(x, y)| (x, y)));
 
     // Note: `u_s` is an indexed version of the input facts `u`
-    let u_s: datafrog::Relation<(u32, (u32, u32))> = Vec::new().into();
+    let u_s: datafrog::Relation<(u32, (u32, u32))> =
+        datafrog::Relation::from_iter(u.iter().map(|&(s, t, u)| (s, (t, u))));
 
     // Note: `c_b` is an indexed version of the input facts `c`
-    let c_b: datafrog::Relation<(u32, (u32, u32))> = Vec::new().into();
+    let c_b: datafrog::Relation<(u32, (u32, u32))> =
+        datafrog::Relation::from_iter(c.iter().map(|&(a, b, c)| (b, (a, c))));
 
     let (p, q) = {
         let mut iteration = datafrog::Iteration::new();

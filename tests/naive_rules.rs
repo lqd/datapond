@@ -33,12 +33,14 @@ fn generate_naive_rules() {
 let borrow_region: datafrog::Relation<(Origin, Loan, Point)> = borrow_region.into();
 
 // Note: `cfg_edge_p` is an indexed version of the input facts `cfg_edge`
-let cfg_edge_p: datafrog::Relation<(Point, Point)> = Vec::new().into();
+let cfg_edge_p: datafrog::Relation<(Point, Point)> = datafrog::Relation::from_iter(
+    cfg_edge.iter().map(|&(p, q)| (p, q))
+);
 
-let invalidates: datafrog::Relation<((Loan, Point), ())> = invalidates.into();
+let invalidates: datafrog::Relation<((Loan, Point), ())> = datafrog::Relation::from_iter(invalidates.iter().map(|&tuple| (tuple, ())));
 let killed: datafrog::Relation<(Loan, Point)> = killed.into();
 let outlives: datafrog::Relation<(Origin, Origin, Point)> = outlives.into();
-let region_live_at: datafrog::Relation<((Origin, Point), ())> = region_live_at.into();
+let region_live_at: datafrog::Relation<((Origin, Point), ())> = datafrog::Relation::from_iter(region_live_at.iter().map(|&tuple| (tuple, ())));
 
 let errors = {
 
@@ -141,6 +143,7 @@ where
     let killed = Vec::new();
     let outlives = Vec::new();
     let region_live_at = Vec::new();
+    let cfg_edge = Vec::new();
 
     // ----- output from the skeleton generator follows below -----
 
@@ -148,13 +151,16 @@ where
 
     let borrow_region: datafrog::Relation<(Origin, Loan, Point)> = borrow_region.into();
 
-    // Note: `cfg_edge_p` is an indexed version of the input facts `cfg_edge`
-    let cfg_edge_p: datafrog::Relation<(Point, Point)> = Vec::new().into();
+    // Note: `cfg_edge_p` is an indexed version of the input facts `cfg_edge` // useless index
+    let cfg_edge_p: datafrog::Relation<(Point, Point)> =
+        datafrog::Relation::from_iter(cfg_edge.iter().map(|&(p, q)| (p, q)));
 
-    let invalidates: datafrog::Relation<((Loan, Point), ())> = invalidates.into();
+    let invalidates: datafrog::Relation<((Loan, Point), ())> =
+        datafrog::Relation::from_iter(invalidates.iter().map(|&tuple| (tuple, ())));
     let killed: datafrog::Relation<(Loan, Point)> = killed.into();
     let outlives: datafrog::Relation<(Origin, Origin, Point)> = outlives.into();
-    let region_live_at: datafrog::Relation<((Origin, Point), ())> = region_live_at.into();
+    let region_live_at: datafrog::Relation<((Origin, Point), ())> =
+        datafrog::Relation::from_iter(region_live_at.iter().map(|&tuple| (tuple, ())));
 
     let errors = {
         let mut iteration = datafrog::Iteration::new();

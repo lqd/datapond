@@ -41,12 +41,16 @@ fn generate_cspa_rules() {
 let assign: datafrog::Relation<(u32, u32)> = assign.into();
 
 // Note: `assign_b` is an indexed version of the input facts `assign`
-let assign_b: datafrog::Relation<(u32, u32)> = Vec::new().into();
+let assign_b: datafrog::Relation<(u32, u32)> = datafrog::Relation::from_iter(
+    assign.iter().map(|&(a, b)| (b, a))
+);
 
 let dereference: datafrog::Relation<(u32, u32)> = dereference.into();
 
 // Note: `dereference_a` is an indexed version of the input facts `dereference`
-let dereference_a: datafrog::Relation<(u32, u32)> = Vec::new().into();
+let dereference_a: datafrog::Relation<(u32, u32)> = datafrog::Relation::from_iter(
+    dereference.iter().map(|&(a, b)| (a, b))
+);
 
 // Note: no output relation in the program
 
@@ -143,12 +147,14 @@ fn ensure_generated_rules_build() {
     let assign: datafrog::Relation<(u32, u32)> = assign.into();
 
     // Note: `assign_b` is an indexed version of the input facts `assign`
-    let assign_b: datafrog::Relation<(u32, u32)> = Vec::new().into();
+    let assign_b: datafrog::Relation<(u32, u32)> =
+        datafrog::Relation::from_iter(assign.iter().map(|&(a, b)| (b, a)));
 
     let dereference: datafrog::Relation<(u32, u32)> = dereference.into();
 
-    // Note: `dereference_a` is an indexed version of the input facts `dereference`
-    let dereference_a: datafrog::Relation<(u32, u32)> = Vec::new().into();
+    // Note: `dereference_a` is an indexed version of the input facts `dereference` // useless index
+    let dereference_a: datafrog::Relation<(u32, u32)> =
+        datafrog::Relation::from_iter(dereference.iter().map(|&(a, b)| (a, b)));
 
     // Note: no output relation in the program
 
@@ -190,7 +196,7 @@ fn ensure_generated_rules_build() {
         // Index maintenance
         value_flow_b.from_map(&value_flow, |&(a, b)| (b, a));
         value_flow_a.from_map(&value_flow, |&(a, b)| (a, b)); // useless index
-        memory_alias_a.from_map(&memory_alias, |&(a, b)| (a, b));  // useless index
+        memory_alias_a.from_map(&memory_alias, |&(a, b)| (a, b)); // useless index
 
         // Rules
 
