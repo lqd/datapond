@@ -107,35 +107,35 @@ let borrow_live_at = iteration.variable::<((Loan, Point), ())>("borrow_live_at")
 let equals = iteration.variable::<(Origin, Origin, Point)>("equals");
 
 // Note: `equals_o1p` is an indexed version of the `equals` relation
-let equals_o1p = iteration.variable::<((Origin, Point), Origin)>("equals_o1p");
+let equals_o1p = iteration.variable_indistinct::<((Origin, Point), Origin)>("equals_o1p");
 
 // Note: `equals_o2p` is an indexed version of the `equals` relation
-let equals_o2p = iteration.variable::<((Origin, Point), Origin)>("equals_o2p");
+let equals_o2p = iteration.variable_indistinct::<((Origin, Point), Origin)>("equals_o2p");
 
 // Note: `equals_p` is an indexed version of the `equals` relation
-let equals_p = iteration.variable::<(Point, (Origin, Origin))>("equals_p");
+let equals_p = iteration.variable_indistinct::<(Point, (Origin, Origin))>("equals_p");
 let equals_step_5_1 = iteration.variable("equals_step_5_1");
 let equals_step_5_2 = iteration.variable("equals_step_5_2");
 let errors = iteration.variable::<(Loan, Point)>("errors");
 let requires = iteration.variable::<(Origin, Loan, Point)>("requires");
 
 // Note: `requires_lp` is an indexed version of the `requires` relation
-let requires_lp = iteration.variable::<((Loan, Point), Origin)>("requires_lp");
+let requires_lp = iteration.variable_indistinct::<((Loan, Point), Origin)>("requires_lp");
 
 // Note: `requires_op` is an indexed version of the `requires` relation
-let requires_op = iteration.variable::<((Origin, Point), Loan)>("requires_op");
+let requires_op = iteration.variable_indistinct::<((Origin, Point), Loan)>("requires_op");
 let requires_step_9_1 = iteration.variable("requires_step_9_1");
 let requires_step_9_2 = iteration.variable("requires_step_9_2");
 let subset = iteration.variable::<((Origin, Origin, Point), ())>("subset");
 
 // Note: `subset_o1p` is an indexed version of the `subset` relation
-let subset_o1p = iteration.variable::<((Origin, Point), Origin)>("subset_o1p");
+let subset_o1p = iteration.variable_indistinct::<((Origin, Point), Origin)>("subset_o1p");
 
 // Note: `subset_o2o1p` is an indexed version of the `subset` relation
-let subset_o2o1p = iteration.variable::<((Origin, Origin, Point), ())>("subset_o2o1p");
+let subset_o2o1p = iteration.variable_indistinct::<((Origin, Origin, Point), ())>("subset_o2o1p");
 
 // Note: `subset_o2p` is an indexed version of the `subset` relation
-let subset_o2p = iteration.variable::<((Origin, Point), Origin)>("subset_o2p");
+let subset_o2p = iteration.variable_indistinct::<((Origin, Point), Origin)>("subset_o2p");
 
 // R01: subset(O1, O2, P) :- outlives(O1, O2, P).
 subset.extend(outlives.iter().map(|&tuple| (tuple, ())));
@@ -253,35 +253,36 @@ where
         let equals = iteration.variable::<(Origin, Origin, Point)>("equals");
 
         // Note: `equals_o1p` is an indexed version of the `equals` relation
-        let equals_o1p = iteration.variable::<((Origin, Point), Origin)>("equals_o1p");
+        let equals_o1p = iteration.variable_indistinct::<((Origin, Point), Origin)>("equals_o1p");
 
         // Note: `equals_o2p` is an indexed version of the `equals` relation
-        let equals_o2p = iteration.variable::<((Origin, Point), Origin)>("equals_o2p");
+        let equals_o2p = iteration.variable_indistinct::<((Origin, Point), Origin)>("equals_o2p");
 
         // Note: `equals_p` is an indexed version of the `equals` relation
-        let equals_p = iteration.variable::<(Point, (Origin, Origin))>("equals_p");
+        let equals_p = iteration.variable_indistinct::<(Point, (Origin, Origin))>("equals_p");
         let equals_step_5_1 = iteration.variable("equals_step_5_1");
         let equals_step_5_2 = iteration.variable("equals_step_5_2");
         let errors = iteration.variable::<(Loan, Point)>("errors");
         let requires = iteration.variable::<(Origin, Loan, Point)>("requires");
 
         // Note: `requires_lp` is an indexed version of the `requires` relation
-        let requires_lp = iteration.variable::<((Loan, Point), Origin)>("requires_lp");
+        let requires_lp = iteration.variable_indistinct::<((Loan, Point), Origin)>("requires_lp");
 
         // Note: `requires_op` is an indexed version of the `requires` relation
-        let requires_op = iteration.variable::<((Origin, Point), Loan)>("requires_op");
+        let requires_op = iteration.variable_indistinct::<((Origin, Point), Loan)>("requires_op");
         let requires_step_9_1 = iteration.variable("requires_step_9_1");
         let requires_step_9_2 = iteration.variable("requires_step_9_2");
         let subset = iteration.variable::<((Origin, Origin, Point), ())>("subset");
 
         // Note: `subset_o1p` is an indexed version of the `subset` relation
-        let subset_o1p = iteration.variable::<((Origin, Point), Origin)>("subset_o1p");
+        let subset_o1p = iteration.variable_indistinct::<((Origin, Point), Origin)>("subset_o1p");
 
         // Note: `subset_o2o1p` is an indexed version of the `subset` relation
-        let subset_o2o1p = iteration.variable::<((Origin, Origin, Point), ())>("subset_o2o1p");
+        let subset_o2o1p =
+            iteration.variable_indistinct::<((Origin, Origin, Point), ())>("subset_o2o1p");
 
         // Note: `subset_o2p` is an indexed version of the `subset` relation
-        let subset_o2p = iteration.variable::<((Origin, Point), Origin)>("subset_o2p");
+        let subset_o2p = iteration.variable_indistinct::<((Origin, Point), Origin)>("subset_o2p");
 
         // R01: subset(O1, O2, P) :- outlives(O1, O2, P).
         subset.extend(outlives.iter().map(|&tuple| (tuple, ())));

@@ -955,7 +955,7 @@ fn generate_skeleton_code(
 
             writeln!(
                 output,
-                "let {variable} = iteration.variable::<({variable_type})>({variable:?});",
+                "let {variable} = iteration.variable_indistinct::<({variable_type})>({variable:?});",
             )?;
         } else {
             // This is an intermediary step variable used in joins

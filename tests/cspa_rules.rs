@@ -61,17 +61,17 @@ let mut iteration = datafrog::Iteration::new();
 let memory_alias = iteration.variable::<(u32, u32)>("memory_alias");
 
 // Note: `memory_alias_a` is an indexed version of the `memory_alias` relation
-let memory_alias_a = iteration.variable::<(u32, u32)>("memory_alias_a");
+let memory_alias_a = iteration.variable_indistinct::<(u32, u32)>("memory_alias_a");
 let memory_alias_step_4_1 = iteration.variable("memory_alias_step_4_1");
 let value_alias = iteration.variable::<(u32, u32)>("value_alias");
 let value_alias_step_6_1 = iteration.variable("value_alias_step_6_1");
 let value_flow = iteration.variable::<(u32, u32)>("value_flow");
 
 // Note: `value_flow_a` is an indexed version of the `value_flow` relation
-let value_flow_a = iteration.variable::<(u32, u32)>("value_flow_a");
+let value_flow_a = iteration.variable_indistinct::<(u32, u32)>("value_flow_a");
 
 // Note: `value_flow_b` is an indexed version of the `value_flow` relation
-let value_flow_b = iteration.variable::<(u32, u32)>("value_flow_b");
+let value_flow_b = iteration.variable_indistinct::<(u32, u32)>("value_flow_b");
 
 // R01: value_flow(y, x) :- assign(y, x).
 value_flow.extend(assign.iter().clone());
@@ -165,17 +165,17 @@ fn ensure_generated_rules_build() {
     let memory_alias = iteration.variable::<(u32, u32)>("memory_alias");
 
     // Note: `memory_alias_a` is an indexed version of the `memory_alias` relation
-    let memory_alias_a = iteration.variable::<(u32, u32)>("memory_alias_a");
+    let memory_alias_a = iteration.variable_indistinct::<(u32, u32)>("memory_alias_a");
     let memory_alias_step_4_1 = iteration.variable("memory_alias_step_4_1");
     let value_alias = iteration.variable::<(u32, u32)>("value_alias");
     let value_alias_step_6_1 = iteration.variable("value_alias_step_6_1");
     let value_flow = iteration.variable::<(u32, u32)>("value_flow");
 
     // Note: `value_flow_a` is an indexed version of the `value_flow` relation
-    let value_flow_a = iteration.variable::<(u32, u32)>("value_flow_a");
+    let value_flow_a = iteration.variable_indistinct::<(u32, u32)>("value_flow_a");
 
     // Note: `value_flow_b` is an indexed version of the `value_flow` relation
-    let value_flow_b = iteration.variable::<(u32, u32)>("value_flow_b");
+    let value_flow_b = iteration.variable_indistinct::<(u32, u32)>("value_flow_b");
 
     // R01: value_flow(y, x) :- assign(y, x).
     value_flow.extend(assign.iter().clone());

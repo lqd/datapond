@@ -66,23 +66,23 @@ let p_step_2_1 = iteration.variable("p_step_2_1");
 let p_step_3_1 = iteration.variable("p_step_3_1");
 
 // Note: `p_x` is an indexed version of the `p` relation
-let p_x = iteration.variable::<(u32, u32)>("p_x");
+let p_x = iteration.variable_indistinct::<(u32, u32)>("p_x");
 
 // Note: `p_y` is an indexed version of the `p` relation
-let p_y = iteration.variable::<(u32, u32)>("p_y");
+let p_y = iteration.variable_indistinct::<(u32, u32)>("p_y");
 let q = iteration.variable::<(u32, u32, u32)>("q");
 
 // Note: `q_a` is an indexed version of the `q` relation
-let q_a = iteration.variable::<(u32, (u32, u32))>("q_a");
+let q_a = iteration.variable_indistinct::<(u32, (u32, u32))>("q_a");
 
 // Note: `q_ab` is an indexed version of the `q` relation
-let q_ab = iteration.variable::<((u32, u32), u32)>("q_ab");
+let q_ab = iteration.variable_indistinct::<((u32, u32), u32)>("q_ab");
 
 // Note: `q_b` is an indexed version of the `q` relation
-let q_b = iteration.variable::<(u32, (u32, u32))>("q_b");
+let q_b = iteration.variable_indistinct::<(u32, (u32, u32))>("q_b");
 
 // Note: `q_bc` is an indexed version of the `q` relation
-let q_bc = iteration.variable::<((u32, u32), u32)>("q_bc");
+let q_bc = iteration.variable_indistinct::<((u32, u32), u32)>("q_bc");
 let q_step_6_1 = iteration.variable("q_step_6_1");
 
 // Duplicate extensional predicates used as `Variable`s
@@ -190,23 +190,23 @@ fn ensure_generated_rules_build() {
         let p_step_3_1 = iteration.variable("p_step_3_1");
 
         // Note: `p_x` is an indexed version of the `p` relation
-        let p_x = iteration.variable::<(u32, u32)>("p_x");
+        let p_x = iteration.variable_indistinct::<(u32, u32)>("p_x");
 
         // Note: `p_y` is an indexed version of the `p` relation
-        let p_y = iteration.variable::<(u32, u32)>("p_y");
+        let p_y = iteration.variable_indistinct::<(u32, u32)>("p_y");
         let q = iteration.variable::<(u32, u32, u32)>("q");
 
         // Note: `q_a` is an indexed version of the `q` relation
-        let q_a = iteration.variable::<(u32, (u32, u32))>("q_a");
+        let q_a = iteration.variable_indistinct::<(u32, (u32, u32))>("q_a");
 
         // Note: `q_ab` is an indexed version of the `q` relation
-        let q_ab = iteration.variable::<((u32, u32), u32)>("q_ab");
+        let q_ab = iteration.variable_indistinct::<((u32, u32), u32)>("q_ab");
 
         // Note: `q_b` is an indexed version of the `q` relation
-        let q_b = iteration.variable::<(u32, (u32, u32))>("q_b");
+        let q_b = iteration.variable_indistinct::<(u32, (u32, u32))>("q_b");
 
         // Note: `q_bc` is an indexed version of the `q` relation
-        let q_bc = iteration.variable::<((u32, u32), u32)>("q_bc");
+        let q_bc = iteration.variable_indistinct::<((u32, u32), u32)>("q_bc");
         let q_step_6_1 = iteration.variable("q_step_6_1");
 
         // Duplicate extensional predicates used as `Variable`s
