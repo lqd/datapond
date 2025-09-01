@@ -95,9 +95,9 @@ while iteration.changed() {
 
     // Index maintenance
     q_m.from_map(&q, |&(m, n, o)| (m, (n, o)));
-    p_bar.from_map(&p, |&((_foo, _bar), _)| (y, x));
+    p_bar.from_map(&p, |&((foo, bar), _)| (bar, foo));
     q_no.from_map(&q, |&(m, n, o)| ((n, o), m));
-    p_foo.from_map(&p, |&((_foo, _bar), _)| (y, z));
+    p_foo.from_map(&p, |&((foo, bar), _)| (foo, bar));
     q_mn.from_map(&q, |&(m, n, o)| ((m, n), o));
     q_n.from_map(&q, |&(m, n, o)| (n, (m, o)));
 
@@ -214,9 +214,9 @@ fn ensure_generated_rules_build() {
         while iteration.changed() {
             // Index maintenance
             q_m.from_map(&q, |&(m, n, o)| (m, (n, o)));
-            p_bar.from_map(&p, |&((_foo, _bar), _)| (0, 0)); // manual fix
+            p_bar.from_map(&p, |&((foo, bar), _)| (bar, foo));
             q_no.from_map(&q, |&(m, n, o)| ((n, o), m));
-            p_foo.from_map(&p, |&((_foo, _bar), _)| (0, 0)); // manual fix
+            p_foo.from_map(&p, |&((foo, bar), _)| (foo, bar));
             q_mn.from_map(&q, |&(m, n, o)| ((m, n), o));
             q_n.from_map(&q, |&(m, n, o)| (n, (m, o)));
 
