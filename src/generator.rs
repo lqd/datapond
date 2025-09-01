@@ -416,7 +416,7 @@ fn generate_skeleton_into(text: &str, output: &mut String, debug: bool) {
                             if extensional.contains(&literal.predicate.to_string()) {
                                 record_extensional_index_use(
                                     &decls,
-                                    &literal.predicate,
+                                    &literal,
                                     &index_relation,
                                     relation_args,
                                     &args_a,
@@ -744,7 +744,7 @@ fn generate_skeleton_into(text: &str, output: &mut String, debug: bool) {
 
         for (idx, relation) in relations.iter().enumerate() {
             let is_index = match extensional_indices.get(relation) {
-                Some((original_predicate, ..)) => format!(" (index on `{}`)", original_predicate),
+                Some(index_use) => format!(" (index on `{}`)", index_use.indexed_relation),
                 None => "".to_string(),
             };
 
@@ -757,7 +757,7 @@ fn generate_skeleton_into(text: &str, output: &mut String, debug: bool) {
         );
         for (idx, relation) in variables_duplicating_relations.iter().enumerate() {
             let is_index = match extensional_indices.get(relation) {
-                Some((original_predicate, ..)) => format!(" (index on `{}`)", original_predicate),
+                Some(index_use) => format!(" (index on `{}`)", index_use.indexed_relation),
                 None => "".to_string(),
             };
 
@@ -802,7 +802,7 @@ fn generate_skeleton_code(
     output: &mut String,
     decls: HashMap<String, ast::PredicateDecl>,
     relations: Vec<String>,
-    extensional_indices: FxHashMap<String, (&syn::Ident, String)>,
+    extensional_indices: FxHashMap<String, IndexUse>,
     variables: Vec<String>,
     intensional_indices: FxHashMap<String, (&ast::Literal, Vec<String>, Vec<String>)>,
     variables_duplicating_relations: Vec<String>,
@@ -827,35 +827,51 @@ fn generate_skeleton_code(
                 .map(|decl| decl.typ_as_string())
                 .collect();
 
-            let arg_types = if predicates_consumed_as_keys.contains(relation) {
+            // Wrap everything as as a key tuple if the predicate is consumed as keys.
+            let predicate_consumed_as_keys = predicates_consumed_as_keys.contains(relation);
+
+            let arg_types = if predicate_consumed_as_keys {
                 format!("({}), ()", arg_types.join(", "))
             } else {
                 arg_types.join(", ")
             };
+            let relation_initializer = if predicate_consumed_as_keys {
+                format!(
+                    "datafrog::Relation::from_iter({relation}.iter().map(|&tuple| (tuple, ())))"
+                )
+            } else {
+                format!("{relation}.into()")
+            };
 
             writeln!(
                 output,
-                "let {relation}: datafrog::Relation<({arg_types})> = {relation}.into();",
+                "let {relation}: datafrog::Relation<({arg_types})> = {relation_initializer};",
             )?;
         } else {
             // This is an index over an extensional predicate
-            let (original_predicate, arg_types) = &extensional_indices[relation];
-
+            let index_use = &extensional_indices[relation];
             let arg_types = if predicates_consumed_as_keys.contains(relation) {
-                format!("({}), ()", arg_types)
+                format!("({}), ()", index_use.index_types)
             } else {
-                arg_types.clone()
+                index_use.index_types.clone()
             };
 
             writeln!(output, "")?;
             writeln!(
                 output,
-                "// Note: `{relation}` is an indexed version of the input facts `{original_predicate}`",
+                "// Note: `{relation}` is an indexed version of the input facts `{}`",
+                index_use.indexed_relation,
             )?;
             writeln!(
                 output,
-                "let {relation}: datafrog::Relation<({arg_types})> = Vec::new().into();",
+                "let {relation}: datafrog::Relation<({arg_types})> = datafrog::Relation::from_iter(",
             )?;
+            writeln!(
+                output,
+                "    {}.iter().map(|&{}| ({}))",
+                index_use.indexed_relation, index_use.input_args, index_use.result_args,
+            )?;
+            writeln!(output, ");",)?;
             writeln!(output, "")?;
         }
     }
@@ -1155,7 +1171,7 @@ fn generate_index_relation<'a>(
     key_args: &Vec<String>,      // the arguments used in the index key
     value_args: &Vec<String>,    // the arguments used in the index value
     extensional_predicates: &mut FxHashSet<String>,
-    extensional_indices: &mut FxHashMap<String, (&'a syn::Ident, String)>,
+    extensional_indices: &mut FxHashMap<String, IndexUse>,
     intensional_predicates: &mut FxHashSet<String>,
     intensional_inputs: &mut FxHashSet<String>,
     intensional_indices: &mut FxHashMap<String, (&'a ast::Literal, Vec<String>, Vec<String>)>,
@@ -1167,7 +1183,7 @@ fn generate_index_relation<'a>(
     if extensional_predicates.contains(&literal.predicate.to_string()) {
         record_extensional_index_use(
             decls,
-            &literal.predicate,
+            &literal,
             &index_relation,
             &relation_args,
             &key_args,
@@ -1203,31 +1219,77 @@ fn record_predicate_use(
     }
 }
 
+#[derive(Debug)]
+struct IndexUse {
+    // The name of the origin relation this index is indexing.
+    indexed_relation: String,
+
+    // A string of the types that this index records. Used to turbofish the Relation that will hold
+    // the tuples.
+    index_types: String,
+
+    // A string of the input relation attributes. Used for the arguments to the closure mapping the
+    // input tuples to the shape of this index's tuples.
+    input_args: String,
+
+    // A string of the tuple key/values this index needs to produce. Used for the body of the close
+    // mapping the input tuples to this index tuples.
+    result_args: String,
+}
+
 fn record_extensional_index_use<'a>(
     decls: &HashMap<String, ast::PredicateDecl>,
-    origin_predicate: &'a syn::Ident, // the relation over which the index relation maps
-    index_predicate: &str,            // the index relation
-    index_args: &Vec<String>,         // the index arguments name and order
-    key_args: &Vec<String>,           // the indexed arguments used in the "key"
-    value_args: &Vec<String>,         // the indexed arguments used in the "value"
+    indexed_literal: &'a ast::Literal, // the relation over which the index relation maps
+    index_predicate: &str,             // the index relation
+    index_args: &Vec<String>,          // the index arguments name and order
+    key_args: &Vec<String>,            // the indexed arguments used in the "key"
+    value_args: &Vec<String>,          // the indexed arguments used in the "value"
     extensional_predicates: &mut FxHashSet<String>,
-    extensional_indices: &mut FxHashMap<String, (&'a syn::Ident, String)>,
+    extensional_indices: &mut FxHashMap<String, IndexUse>,
 ) {
     // Canonicalize the types of the keys and value arguments
     let key_types: Vec<_> = key_args
         .iter()
-        .map(|v| canonicalize_arg_type(&decls, origin_predicate, index_args, v).to_string())
+        .map(|v| {
+            canonicalize_arg_type(&decls, &indexed_literal.predicate, index_args, v).to_string()
+        })
         .collect();
     let arg_types: Vec<_> = value_args
         .iter()
-        .map(|v| canonicalize_arg_type(&decls, origin_predicate, index_args, v).to_string())
+        .map(|v| {
+            canonicalize_arg_type(&decls, &indexed_literal.predicate, index_args, v).to_string()
+        })
+        .collect();
+    let index_types = join_types_as_tuple(key_types, arg_types);
+
+    // Canonicalize the key/values to their names in the relation declaration, to emit them in the
+    // closure creating the index tuples.
+    let arg_names: Vec<_> = indexed_literal.args.iter().map(|v| v.to_string()).collect();
+    let canonicalized_key: Vec<_> = key_args
+        .iter()
+        .map(|v| canonicalize_arg_name(&decls, &indexed_literal.predicate, &arg_names, v))
+        .collect();
+    let canonicalized_args: Vec<_> = value_args
+        .iter()
+        .map(|v| canonicalize_arg_name(&decls, &indexed_literal.predicate, &arg_names, v))
         .collect();
 
+    let decl = &decls[&indexed_literal.predicate.to_string()];
+    let input_args: Vec<_> = decl
+        .parameters
+        .iter()
+        .map(|p| p.name.to_string().to_lowercase()) // sus
+        .collect();
+
+    let index_use = IndexUse {
+        indexed_relation: indexed_literal.predicate.to_string(),
+        index_types,
+        input_args: join_args_as_tuple(&input_args, &canonicalized_key, &canonicalized_args),
+        result_args: join_types_as_tuple(canonicalized_key, canonicalized_args),
+    };
+
     extensional_predicates.insert(index_predicate.to_string());
-    extensional_indices.insert(
-        index_predicate.to_string(),
-        (origin_predicate, join_types_as_tuple(key_types, arg_types)),
-    );
+    extensional_indices.insert(index_predicate.to_string(), index_use);
 }
 
 fn record_intensional_index_use<'a>(
