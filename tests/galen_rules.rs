@@ -88,7 +88,7 @@ let q_step_6_1 = iteration.variable("q_step_6_1");
 // Duplicate extensional predicates used as `Variable`s
 
 let c_b = {
-    let var = iteration.variable("c_b");
+    let var = iteration.variable_indistinct("c_b");
     var.extend(c_b.iter().clone());
     var
 };
@@ -212,7 +212,7 @@ fn ensure_generated_rules_build() {
         // Duplicate extensional predicates used as `Variable`s
 
         let c_b = {
-            let var = iteration.variable("c_b");
+            let var = iteration.variable_indistinct("c_b");
             var.extend(c_b.iter().clone());
             var
         };

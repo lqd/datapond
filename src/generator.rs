@@ -953,6 +953,8 @@ fn generate_skeleton_code(
                 variable_type
             };
 
+            // Indices also don't need to check for uniqueness of values, this was already done in
+            // the indexed relation itself when adding in new data.
             writeln!(
                 output,
                 "let {variable} = iteration.variable_indistinct::<({variable_type})>({variable:?});",
@@ -1001,8 +1003,13 @@ fn generate_skeleton_code(
                 // This is an intermediary step variable used in joins
                 // We shouldn't need all the arg types as we're duplicating a known relation and
                 // they can be inferred. Usually.
+                // Since this is duplicating a Relation as a Variable, we also don't need for it to
+                // check for uniqueness.
                 writeln!(output, "let {variable} = {{")?;
-                writeln!(output, "    let var = iteration.variable({variable:?});",)?;
+                writeln!(
+                    output,
+                    "    let var = iteration.variable_indistinct({variable:?});",
+                )?;
                 writeln!(output, "    var.extend({variable}.iter().clone());")?;
                 writeln!(output, "    var")?;
                 writeln!(output, "}};")?;
