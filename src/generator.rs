@@ -560,7 +560,7 @@ fn generate_skeleton_into(text: &str, output: &mut String, debug: bool) {
                 ));
             }
             Operation::DynamicMap(step) => {
-                warn!(
+                eprintln!(
                     "warning: untested code generation! dynamic map step: {:?}",
                     step
                 );
