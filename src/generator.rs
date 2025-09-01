@@ -982,7 +982,14 @@ fn generate_skeleton_code(
                     key.join(", "),
                 );
             } else {
-                unreachable!();
+                // This is an intermediary step variable used in joins
+                // We shouldn't need all the arg types as we're duplicating a known relation and
+                // they can be inferred. Usually.
+                writeln!(output, "let {variable} = {{")?;
+                writeln!(output, "    let var = iteration.variable({variable:?});",)?;
+                writeln!(output, "    var.extend({variable}.iter().clone());")?;
+                writeln!(output, "    var")?;
+                writeln!(output, "}};")?;
             }
         }
     }
