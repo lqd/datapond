@@ -1032,8 +1032,50 @@ fn generate_skeleton_code(
         // take care of the unit value to correctly read the source tuples.
         let relation_args = if predicates_consumed_as_keys.contains(&original_relation.to_string())
         {
-            let relation_args = join_args_as_tuple(&declared_args, &key, &args);
-            format!("({}, _)", relation_args)
+            // We need to canonicalize the key/args for the predicates consumed as keys as well,
+            // otherwise they can refer to the names in the joins needing the index, rather than the
+            // actual attributes of the relation. This happens in the galen rules test.
+
+            // However, if we do that just like for regular indices, then something can still go
+            // wrong, depending on whether we're indexing a subset of the attributes for these
+            // predicates consumed as keys or not (in the latter case there are no `args` here). Key
+            // canonicalization can incorrectly reorder the attributes, and this happens in the flow
+            // sensitive rules test. Something is still fishy here, and there could still be issues
+            // in the tuples because we don't do canonicalization in this instance...
+            //
+            // In particular, we don't canonicalize when recording details of an intensional index
+            // use in `record_intensional_index_use`, while we do for extensional indices in
+            // `record_extensional_index_use`, and maybe we should. This needs some more investigation.
+            if args.is_empty() {
+                let relation_args = join_args_as_tuple(&declared_args, &key, &args);
+                format!("({}, _)", relation_args)
+            } else {
+                let arg_names: Vec<_> =
+                    indexed_literal.args.iter().map(|v| v.to_string()).collect();
+                let canonicalized_key: Vec<_> = key
+                    .iter()
+                    .map(|v| {
+                        canonicalize_arg_name(&decls, &indexed_literal.predicate, &arg_names, v)
+                    })
+                    .collect();
+                let canonicalized_args: Vec<_> = args
+                    .iter()
+                    .map(|v| {
+                        canonicalize_arg_name(&decls, &indexed_literal.predicate, &arg_names, v)
+                    })
+                    .collect();
+
+                produced_key = join_args_as_tuple(&canonicalized_key, &canonicalized_key, &args);
+                produced_args = join_args_as_tuple(
+                    &canonicalized_args,
+                    &canonicalized_key,
+                    &canonicalized_args,
+                );
+
+                let relation_args =
+                    join_args_as_tuple(&declared_args, &canonicalized_key, &canonicalized_args);
+                format!("({}, _)", relation_args)
+            }
         } else {
             let arg_names: Vec<_> = indexed_literal.args.iter().map(|v| v.to_string()).collect();
 
